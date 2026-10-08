@@ -1,12 +1,15 @@
 source("./syntax/function.R")
 
+# Create output directory if it doesn't exist
+dir.create("./derived", showWarnings = FALSE, recursive = TRUE)
+
 # italy_crs and region_boundaries are loaded from function.R
 italy_crs <- 3035
 
 base_ras <- terra::rast("./data/processed_data/masks/Italy_base_raster.tif")
 
-solar_path <- "../data/Global-Solar-Power-Tracker-February-2026.xlsx"
-wind_path  <- "../data/Global-Wind-Power-Tracker-February-2026.xlsx"
+solar_path <- "./data/Global-Solar-Power-Tracker-February-2026.xlsx"
+wind_path  <- "./data/Global-Wind-Power-Tracker-February-2026.xlsx"
 
 
 # ── SOLAR ──────────────────────────────────────────────────────────────────────

@@ -70,8 +70,19 @@ randomPts <- function(raster_mask, seeds, tech, location_csv){
 # ── SOLAR ──────────────────────────────────────────────────────────────────────
 
 solar_mask_rast    <- terra::rast("./derived/solar_hull_existing_mask.tif")
-solar_suit         <- terra::rast("./data/processed_data/masks/solar_suitability_SL1.tif")
 solar_location_csv <- read_csv("./derived/solar_hull_existing.csv")
+
+# Load suitability mask; fall back to base raster (all Italian land = suitable)
+# if the proper mask has not been built yet. Replace with a real mask derived
+# from Natura 2000, slope, and land-use constraints before final analysis.
+solar_suit_path <- "./data/processed_data/masks/solar_suitability_SL1.tif"
+if (file.exists(solar_suit_path)) {
+  solar_suit <- terra::rast(solar_suit_path)
+} else {
+  warning("solar_suitability_SL1.tif not found — using base raster as placeholder. ",
+          "Replace with a proper suitability mask before final analysis.")
+  solar_suit <- terra::rast("./data/processed_data/masks/Italy_base_raster.tif")
+}
 
 # Remove existing solar sites from the eligible absence area
 solar_absence_roi <- solar_suit %>%
@@ -94,8 +105,17 @@ s_ab_sf <- randomPts(raster_mask = solar_absence_roi,
 # ── WIND ───────────────────────────────────────────────────────────────────────
 
 wind_mask_rast    <- terra::rast("./derived/wind_hull_existing_mask.tif")
-wind_suit         <- terra::rast("./data/processed_data/masks/wind_suitability_SL1.tif")
 wind_location_csv <- read_csv("./derived/wind_hull_existing.csv")
+
+# Same fallback for wind suitability mask.
+wind_suit_path <- "./data/processed_data/masks/wind_suitability_SL1.tif"
+if (file.exists(wind_suit_path)) {
+  wind_suit <- terra::rast(wind_suit_path)
+} else {
+  warning("wind_suitability_SL1.tif not found — using base raster as placeholder. ",
+          "Replace with a proper suitability mask before final analysis.")
+  wind_suit <- terra::rast("./data/processed_data/masks/Italy_base_raster.tif")
+}
 
 # Remove existing wind sites from the eligible absence area
 wind_absence_roi <- wind_suit %>%
