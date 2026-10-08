@@ -5,3 +5,7 @@
 derived/
 archive/
 preprocessing/
+
+# Downloaded and processed raster data — too large for git
+data/raw_downloads/
+data/processed_data/
