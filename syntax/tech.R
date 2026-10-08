@@ -1,50 +1,63 @@
-base_ras <- terra::rast("./data/processed_data/masks/US_base_raster.tif")
+source("./syntax/function.R")
 
-# read in new data from the USGS database
-wind_location_path <- '../data/raw_data/uswtdb_v7_2_20241120.geojson'
-solar_location_path <- '../data/raw_data/uspvdb_v2_0_20240801.geojson'
+# italy_crs and region_boundaries are loaded from function.R
+italy_crs <- 3035
 
+base_ras <- terra::rast("./data/processed_data/masks/Italy_base_raster.tif")
 
-# solar
-solar_mask <- st_read(solar_location_path) %>% # read in the file
-  filter(!p_state %in% c("HI","AK")) %>% 
-  mutate(unique_id = row_number()) %>% 
-  st_transform(crs = 5070) %>% # transform crs to ours
-  st_buffer(dist = 500) # apply buffer calculated above
-# plot(solar_mask$geometry)
-
-solar_locations <- st_read(solar_location_path) %>% # read in the file
-  st_transform(crs = 5070) %>% # reproject crs into projection of base raster
-  filter(p_year >= 2017) %>% #projects after 2017
-  filter(p_cap_ac >= 1) %>% 
-  filter(!p_state %in% c("HI","AK")) %>% 
-  mutate(unique_id = row_number()) %>% 
-  rename(state_code = p_state) %>% 
-  
-  mutate(area_m2 = st_area(geometry),
-         radius_m = sqrt(area_m2/pi) %>% 
-           as.numeric()) 
+solar_path <- "../data/Global-Solar-Power-Tracker-February-2026.xlsx"
+wind_path  <- "../data/Global-Wind-Power-Tracker-February-2026.xlsx"
 
 
-# rasterize mask
-solar_mask_rast <- solar_mask %>% # vectorize to rasterize
+# ── SOLAR ──────────────────────────────────────────────────────────────────────
+
+solar_raw <- read_xlsx(solar_path, sheet = "Utility-Scale (1 MW+)") %>%
+  filter(`Country/Area`    == "Italy",
+         `Technology Type` %in% c("PV", "Assumed PV"),
+         Status            == "operating",
+         !is.na(Latitude), !is.na(Longitude))
+
+solar_sf <- solar_raw %>%
+  st_as_sf(coords = c("Longitude", "Latitude"), crs = 4326) %>%
+  st_transform(crs = italy_crs)
+
+# Assign Italian NUTS-2 region to each plant via spatial join
+solar_sf <- solar_sf %>%
+  st_join(region_boundaries %>% select(NUTS_NAME), join = st_within) %>%
+  rename(state_code = NUTS_NAME)
+
+# Mask: all operating plants buffered 500 m — used to exclude existing sites
+# from absence-point sampling (equivalent to solar_mask in the US workflow).
+solar_mask <- solar_sf %>%
+  mutate(unique_id = row_number()) %>%
+  st_buffer(dist = 500)
+
+# Locations: plants commissioned >=2017, capacity >=1 MW.
+# area_m2 is estimated at 10,000 m²/MW (~1 ha/MW: standard utility-scale solar
+# density including access roads and setbacks). radius_m replaces st_area() on
+# polygon footprints and is used in absence.R to size absence-point buffers.
+solar_locations <- solar_sf %>%
+  filter(`Start year`    >= 2017,
+         `Capacity (MW)` >= 1,
+         !is.na(state_code)) %>%
+  mutate(unique_id = row_number(),
+         area_m2   = `Capacity (MW)` * 10000,
+         radius_m  = sqrt(area_m2 / pi))
+
+# Rasterize mask
+solar_mask_rast <- solar_mask %>%
   terra::vect() %>%
-  terra::rasterize(y = base_ras,
-                   field = "unique_id",
-                   touches = TRUE) %>% 
+  terra::rasterize(y = base_ras, field = "unique_id", touches = TRUE) %>%
   terra::mask(base_ras)
 # plot(solar_mask_rast)
 
-# rasterize locations
-solar_location_rast <- solar_locations %>% 
-  terra::vect() %>% # vectorize to rasterize
-  terra::rasterize(y = base_ras,
-                   field = "unique_id",
-                   touches = TRUE) %>% # any polygon that touches will be converted
+# Rasterize locations
+solar_location_rast <- solar_locations %>%
+  terra::vect() %>%
+  terra::rasterize(y = base_ras, field = "unique_id", touches = TRUE) %>%
   terra::mask(base_ras)
 
-
-# save
+# Save
 writeRaster(x = solar_mask_rast,
             filename = "./derived/solar_hull_existing_mask.tif",
             overwrite = TRUE)
@@ -53,78 +66,63 @@ writeRaster(x = solar_location_rast,
             filename = "./derived/solar_hull_existing.tif",
             overwrite = TRUE)
 
-
-write_csv(solar_locations, path = "./derived/solar_hull_existing.csv",
-          append = FALSE)
-
-# # append = FALSE allows this command to overwrite previous results
-# st_write(solar_locations %>% 
-#            mutate(point = st_centroid(geometry)),
-#          "./derived/solar_hull_existing_pts.shp",
-#          append = FALSE)
+write_csv(solar_locations %>% st_drop_geometry(),
+          file = "./derived/solar_hull_existing.csv")
 
 
+# ── WIND ───────────────────────────────────────────────────────────────────────
 
+# The GEM Wind Power Tracker is already at project level — no turbine
+# aggregation or convex-hull step needed (unlike USWTDB which stored individual
+# turbine points that had to be grouped by project name).
 
-# wind
-wind_mask <- st_read(wind_location_path) %>% # read in the file
-  filter(!t_state %in% c("HI","AK")) %>% 
-  mutate(unique_id = row_number()) %>% 
-  st_transform(crs = 5070) %>% # transform crs to ours
-  st_buffer(dist = 500) # apply buffer calculated above
-# plot(wind_mask$geometry)
+wind_raw <- read_xlsx(wind_path, sheet = "Data") %>%
+  filter(`Country/Area`      == "Italy",
+         `Installation Type` == "Onshore",
+         Status              == "operating",
+         !is.na(Latitude), !is.na(Longitude))
 
+wind_sf <- wind_raw %>%
+  st_as_sf(coords = c("Longitude", "Latitude"), crs = 4326) %>%
+  st_transform(crs = italy_crs)
 
-wind_locations <- st_read(wind_location_path) %>% # read in the file
-  st_transform(crs = 5070) %>% # reproject crs into projection of base raster
-  # st_crop(y = aoi_state) %>% # crop the data to the aoi
-  filter(p_year >= 2017) %>% #projects after 2017
-  rename(state_code = t_state) %>% 
-  group_by(p_name, 
-           state_code) %>% 
-  summarise(group_size = n(), # make count column of points
-            p_cap = sum(t_cap, na.rm = T)) %>% 
-  ungroup() %>% 
-  
-  filter(p_cap >= 10) %>% 
-  st_buffer(dist = 500,
-            endCapStyle = 'ROUND')  %>% # Buffer points by 500m for locations
-  group_by(p_name, # grab all of the other data for each p_name
-           state_code,
-           group_size,
-           p_cap) %>% 
-  summarise(geometry = st_convex_hull(st_union(geometry))) %>% # make a convex hull of each p_name geometry column
-  ungroup() %>% 
-  filter(state_code != "NA") %>% 
-  filter(!state_code %in% c("HI","AK")) %>% 
-  mutate(unique_id = row_number()) %>% 
-  
-  mutate(area_m2 = st_area(geometry),
-         radius_m = sqrt(area_m2/pi) %>% 
-           as.numeric()) 
+# Assign Italian NUTS-2 region via spatial join
+wind_sf <- wind_sf %>%
+  st_join(region_boundaries %>% select(NUTS_NAME), join = st_within) %>%
+  rename(state_code = NUTS_NAME)
 
+# Mask: all operating plants buffered 500 m.
+wind_mask <- wind_sf %>%
+  mutate(unique_id = row_number()) %>%
+  st_buffer(dist = 500)
 
-# rasterize mask
-wind_mask_rast <- wind_mask %>% # vectorize to rasterize
+# Locations: plants commissioned >=2017, capacity >=10 MW.
+# area_m2 estimated at 300,000 m²/MW (~3 MW/km²: typical onshore wind array
+# density including turbine spacing). This approximates the convex-hull area
+# computed from individual turbine points in the US workflow.
+wind_locations <- wind_sf %>%
+  filter(`Start year`    >= 2017,
+         `Capacity (MW)` >= 10,
+         !is.na(state_code)) %>%
+  mutate(unique_id = row_number(),
+         p_cap     = `Capacity (MW)`,
+         area_m2   = `Capacity (MW)` * 300000,
+         radius_m  = sqrt(area_m2 / pi))
+
+# Rasterize mask
+wind_mask_rast <- wind_mask %>%
   terra::vect() %>%
-  terra::rasterize(y = base_ras,
-                   field = "unique_id",
-                   touches = TRUE) %>% 
+  terra::rasterize(y = base_ras, field = "unique_id", touches = TRUE) %>%
   terra::mask(base_ras)
 # plot(wind_mask_rast)
 
-# rasterize locations
-wind_location_rast <- wind_locations %>% 
-  terra::vect() %>% # vectorize to rasterize
-  terra::rasterize(y = base_ras,
-                   field = "unique_id",
-                   touches = TRUE) %>% # any polygon that touches will be converted
+# Rasterize locations
+wind_location_rast <- wind_locations %>%
+  terra::vect() %>%
+  terra::rasterize(y = base_ras, field = "unique_id", touches = TRUE) %>%
   terra::mask(base_ras)
 
-
-
-
-# save
+# Save
 writeRaster(x = wind_mask_rast,
             filename = "./derived/wind_hull_existing_mask.tif",
             overwrite = TRUE)
@@ -133,19 +131,9 @@ writeRaster(x = wind_location_rast,
             filename = "./derived/wind_hull_existing.tif",
             overwrite = TRUE)
 
-
-write_csv(wind_locations, path = "./derived/wind_hull_existing.csv",
-          append = FALSE)
-
-# # append = FALSE allows this command to overwrite previous results
-# st_write(wind_locations %>% 
-#            mutate(point = st_centroid(geometry)),
-#          "./derived/wind_hull_existing_pts.shp",
-#          append = FALSE)
+write_csv(wind_locations %>% st_drop_geometry(),
+          file = "./derived/wind_hull_existing.csv")
 
 
-save(solar_locations,
-     wind_locations,
+save(solar_locations, wind_locations,
      file = "./derived/location.RData")
-
-
