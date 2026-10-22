@@ -1,63 +1,52 @@
 source("./syntax/function.R")
 
 load("./derived/total.RData")
-dac_masked <- rast("./derived/dac_masked.tif")
 results_masked <- rast("./derived/results_masked.tif")
 
 # plot(dac_masked)
 # plot(results_masked)
 
 ### f1
-f1a <- solar_locations %>% 
-  mutate(geometry = st_centroid(geometry)) %>% 
+f1a <- solar_locations %>%
   ggplot() +
-  geom_sf(data = state_boundaries, fill = "gray50", color = "gray0") + # US border
-  geom_sf(aes(color = p_cap_ac), size = 0.5) +
+  geom_sf(data = region_boundaries, fill = "gray50", color = "gray0") +  # Italy NUTS-2 border
+  geom_sf(aes(color = `Capacity (MW)`), size = 0.5) +
   theme_minimal() +
   scale_color_gradientn(colors = brewer.pal(n = 9, name = "YlOrRd")) +
-  # scale_color_viridis_c(direction = -1) +
   labs(title = "Existing solar", color = "Capacity\n(MW)") +
-  coord_sf(crs = st_crs(2163), xlim = c(-2500000, 2500000), 
-           ylim = c(-2300000,730000), expand = FALSE, datum = NA) +
+  coord_sf(crs = st_crs(3035), datum = NA) +
   theme(legend.position = "right")
 
 
-f1b <- wind_locations %>% 
-  mutate(geometry = st_centroid(geometry)) %>% 
+f1b <- wind_locations %>%
   ggplot() +
-  geom_sf(data = state_boundaries, fill = "gray50", color = "gray0") + # US border
-  geom_sf(aes(color = p_cap/1000), size = 0.5) +
+  geom_sf(data = region_boundaries, fill = "gray50", color = "gray0") +  # Italy NUTS-2 border
+  geom_sf(aes(color = p_cap / 1000), size = 0.5) +
   theme_minimal() +
   scale_color_gradientn(colors = brewer.pal(n = 9, name = "YlOrRd")) +
-  # scale_color_viridis_c(direction = -1) +
   labs(title = "Existing wind", color = "Capacity\n(GW)") +
-  coord_sf(crs = st_crs(2163), xlim = c(-2500000, 2500000), 
-           ylim = c(-2300000,730000), expand = FALSE, datum = NA) +
+  coord_sf(crs = st_crs(3035), datum = NA) +
   theme(legend.position = "right")
 
-f1c <- s_ab_sf %>% 
-  st_buffer(dist = 5000) %>% 
+f1c <- s_ab_sf %>%
+  st_buffer(dist = 5000) %>%
   ggplot() +
-  geom_sf(data = state_boundaries, fill = "gray50", color = "gray0") + # US border
+  geom_sf(data = region_boundaries, fill = "gray50", color = "gray0") +
   geom_sf(aes(fill = factor(iteration)), color = "NA", size = 0.001) +
   theme_minimal() +
   scale_fill_manual(values = brewer.pal(n = 10, name = "Paired")) +
-  # scale_fill_viridis_b(option = "B", n.breaks = 10, direction = -1) +
   labs(title = "Pseudo-absence - solar", fill = "Iteration") +
-  coord_sf(crs = 2163, xlim = c(-2500000, 2500000), 
-           ylim = c(-2300000,730000), expand = FALSE, datum = NA) +
+  coord_sf(crs = st_crs(3035), datum = NA) +
   theme(legend.position = "right")
 
-f1d <- w_ab_sf %>% 
+f1d <- w_ab_sf %>%
   ggplot() +
-  geom_sf(data = state_boundaries, fill = "gray50", color = "gray0") + # US border
+  geom_sf(data = region_boundaries, fill = "gray50", color = "gray0") +
   geom_sf(aes(fill = factor(iteration)), color = "NA", size = 0.001) +
   theme_minimal() +
   scale_fill_manual(values = brewer.pal(n = 10, name = "Paired")) +
-  # scale_fill_viridis_b(option = "B", n.breaks = 10, direction = -1) +
   labs(title = "Pseudo-absence - wind", fill = "Iteration") +
-  coord_sf(crs = st_crs(2163), xlim = c(-2500000, 2500000), 
-           ylim = c(-2300000,730000), expand = FALSE, datum = NA) +
+  coord_sf(crs = st_crs(3035), datum = NA) +
   theme(legend.position = "right")
 
 
@@ -272,8 +261,8 @@ raster_grobs_labeled <- arrangeGrob(raster_grobs,
                                                    gp = gpar(fontsize = 16)))
 # grid.draw(raster_grobs_labeled)
 
-barplot <- rgn_results %>% 
-  mutate(region = factor(region, levels = c("West","Mtwest","Midwest","Texas","South","Northeast"))) %>% 
+barplot <- rgn_results %>%
+  mutate(region = factor(region, levels = c("Nord-Ovest","Nord-Est","Centro","Sud","Isole"))) %>%
   ggplot(aes(x = region, y = mean, fill = model)) +
   geom_bar(stat = "identity", position = position_dodge(width = 0.8), width = 0.6) +
   # geom_point(position = position_dodge(width = 0.8)) +
@@ -363,8 +352,8 @@ grid.arrange(grobs = list(raster_grobs_labeled, barplot_grob, legend_grob), layo
 dev.off()
 
 ### f4
-s_f4 <- s_d %>% 
-  mutate(region = factor(region, levels = c("West","Mtwest","Midwest","Texas","South","Northeast"))) %>% 
+s_f4 <- s_d %>%
+  mutate(region = factor(region, levels = c("Nord-Ovest","Nord-Est","Centro","Sud","Isole"))) %>%
     ggplot(aes(x = R_effect, y = region, xmin=R_effect-SE, xmax=R_effect+SE)) +
     geom_vline(xintercept = 0,linetype = "dashed", size = 0.5, color = "gray30") +
     
@@ -387,8 +376,8 @@ s_f4 <- s_d %>%
           plot.title=element_text(family="Franklin Gothic Demi", size=20)) 
   
 
-w_f4 <-  w_d %>% 
-  mutate(region = factor(region, levels = c("West","Mtwest","Midwest","Texas","South","Northeast"))) %>% 
+w_f4 <- w_d %>%
+  mutate(region = factor(region, levels = c("Nord-Ovest","Nord-Est","Centro","Sud","Isole"))) %>%
   ggplot(aes(x = R_effect, y = region, xmin=R_effect-SE, xmax=R_effect+SE)) +
   geom_vline(xintercept = 0,linetype = "dashed", size = 0.5, color = "gray30") +
   
@@ -412,23 +401,22 @@ w_f4 <-  w_d %>%
 
 
 maps <- map(.x = c("Population density", "Transmission dist", "Environmental score"),
-            .f = function(x) rgn %>% 
+            .f = function(x) rgn %>%
               left_join(s_d, by = "region") %>%
               filter(variable == x) %>%
-              
+
               ggplot() +
-              geom_sf(fill = "white", color = "gray0") + # US border
+              geom_sf(fill = "white", color = "gray0") +
               geom_sf(aes(fill = R_effect), size = 0.3) +
-              
+
               theme_minimal() +
-              scale_fill_gradient2(low = if (x %in% c("Transmission dist", "Environmental score")) "darkorange3" else "royalblue3", 
-                                   mid = "white", 
-                                   high = if (x %in% c("Transmission dist", "Environmental score")) "royalblue3" else "darkorange3", 
+              scale_fill_gradient2(low = if (x %in% c("Transmission dist", "Environmental score")) "darkorange3" else "royalblue3",
+                                   mid = "white",
+                                   high = if (x %in% c("Transmission dist", "Environmental score")) "royalblue3" else "darkorange3",
                                    midpoint = 0) +
-              
+
               labs(title = x, fill = "") +
-              coord_sf(crs = st_crs(2163), xlim = c(-2500000, 2500000), 
-                       ylim = c(-2300000,730000), expand = FALSE, datum = NA) +
+              coord_sf(crs = st_crs(3035), datum = NA) +
               theme(legend.position = "right",
                     plot.title = element_text(hjust = 0.5))
 )
@@ -437,23 +425,22 @@ s_f41 <- plot_grid(plotlist = maps, labels = "A", label_size = 14, label_fontfac
 
 
 maps <- map(.x = c("Capacity factor", "Spatial lag", "Transmission dist"),
-            .f = function(x) rgn %>% 
+            .f = function(x) rgn %>%
               left_join(w_d, by = "region") %>%
               filter(variable == x) %>%
-              
+
               ggplot() +
-              geom_sf(fill = "white", color = "gray0") + # US border
+              geom_sf(fill = "white", color = "gray0") +
               geom_sf(aes(fill = R_effect), size = 0.3) +
-              
+
               theme_minimal() +
-              scale_fill_gradient2(low = if (x %in% c("Transmission dist", "Environmental score")) "darkorange3" else "royalblue3", 
-                                   mid = "white", 
-                                   high = if (x %in% c("Transmission dist", "Environmental score")) "royalblue3" else "darkorange3", 
+              scale_fill_gradient2(low = if (x %in% c("Transmission dist", "Environmental score")) "darkorange3" else "royalblue3",
+                                   mid = "white",
+                                   high = if (x %in% c("Transmission dist", "Environmental score")) "royalblue3" else "darkorange3",
                                    midpoint = 0) +
-              
+
               labs(title = x, fill = "") +
-              coord_sf(crs = st_crs(2163), xlim = c(-2500000, 2500000), 
-                       ylim = c(-2300000,730000), expand = FALSE, datum = NA) +
+              coord_sf(crs = st_crs(3035), datum = NA) +
               theme(legend.position = "right",
                     plot.title = element_text(hjust = 0.5))
 )
@@ -541,91 +528,10 @@ ggsave("./fig/f4.png", f4, width = 12, height = 12)
 
 
 
-rr <- dac_masked
-names(rr) <- c("Solar_NonDAC", "Solar_DAC", "Wind_NonDAC", "Wind_DAC")
-
-f5a <- ggplot() +
-
-  # This draws the shape of the US in gray before the raster is added
-  geom_sf(data = rgn, fill = "gray80", color = "white", linewidth = 0.2) +
-  
-  # geom_spatraster will draw the colors on top of the gray land
-  geom_spatraster(data = rr) +
-  
-  geom_sf(data = rgn, fill = NA, color = "white", linewidth = 0.2) +
-  
-  scale_fill_viridis_c(
-    option = "viridis", 
-    na.value = "transparent", # CRITICAL: Makes NA areas show the gray map underneath
-    name = "Probability   ",
-    labels = scales::label_number()
-  ) +
-  facet_wrap(~lyr, ncol = 2) +
-  theme_void() + # Removes the grid and axis labels for a cleaner look
-  theme(
-    strip.text = element_text(face = "bold", size = 12, margin = margin(b = 10)),
-    legend.position = "bottom",
-    legend.key.width = unit(2, "cm"),
-    plot.margin = margin(10, 10, 10, 10)
-  )
-
-
-f5b <- ttest_results %>%
-  mutate(
-    diff = mean_nonDAC - mean_DAC,
-    pooled_sd = sqrt((sd_DAC^2 + sd_nonDAC^2) / 2),
-    cohen_d = diff / pooled_sd,
-    sig = p_value < 0.05
-  ) %>% 
-  mutate(region = factor(region, levels = c("West","Mtwest","Midwest","Texas","South","Northeast"))) %>% 
-  ggplot(aes(x = model, y = cohen_d)) +
-  geom_hline(yintercept = 0, linetype = "dashed", color = "gray50") +
-  
-  # points: filled if significant, hollow if not
-  geom_point(
-    aes(fill = sig),
-    shape = 21,
-    size = 2,
-    stroke = 1
-  ) +
-  
-  facet_grid(tech ~ region, switch = "y") +
-  
-  scale_fill_manual(values = c(`FALSE` = "white", `TRUE` = "black")) +
-  
-  labs(
-    title = "Effect Size (Cohen’s d) for Non‑DAC vs DAC",
-    subtitle = "Filled points indicate significant differences (p < 0.05) of t-test",
-    x = "Region",
-    y = "Effect Size (Cohen’s d)",
-    color = "Model",
-    fill = "Significant"
-  ) +
-  
-  theme_bw(base_size = 14) +
-  theme(panel.grid.minor = element_blank(),
-        panel.grid.major.x = element_blank(),
-        strip.background =element_rect(fill="gray22",color="gray22"),
-        strip.text = element_text(color = 'white',family="Franklin Gothic Book",size=12),
-        strip.text.y.left = element_text(angle = 0, size = 12, face = "bold"),
-        strip.placement = "outside",
-        legend.position = "bottom",
-        axis.text.x = element_text(angle = 30, hjust = 1,
-                                   color = "black",family="Franklin Gothic Book",size=11),
-        axis.text.y = element_text(color = "black",family="Franklin Gothic Book",size=11),
-        axis.title.x = element_text(color = "black",family="Franklin Gothic Book",size=11),
-        plot.title=element_text(family="Franklin Gothic Demi", size=14))
-
-
-ggsave("./fig/f5.png", 
-       ggarrange(f5a,f5b, nrow = 2,
-                 heights = c(2,1),
-                 labels = c("A", "B"),  # Adds labels to plots
-                 label.x = 0,        # Adjust horizontal position of labels
-                 label.y = 1,        # Adjust vertical position of labels
-                 font.label = list(size = 14, font = "plain")), 
-       
-       width = 12, height = 12)
+# ── f5: DAC analysis (US-specific) ───────────────────────────────────────────
+# The Disadvantaged Communities (DAC) analysis was US-specific and has been
+# removed for the Italy fork. Add an Italian equivalent (e.g. deprived-area
+# mapping based on ISTAT deprivation indices) when that data is available.
 
 
 

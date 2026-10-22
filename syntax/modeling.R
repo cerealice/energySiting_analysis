@@ -1,39 +1,39 @@
-## modeling 
+source("./syntax/function.R")
+
+## modeling
 #### solar
-solar.cov.existing <- read_csv("./derived/existing_cov_solar.csv") 
-s.bg <- read_csv("./derived/bg_cov_solar.csv") 
-solar.cov.bg <- s.bg %>% 
+solar.cov.existing <- read_csv("./derived/existing_cov_solar.csv")
+s.bg <- read_csv("./derived/bg_cov_solar.csv")
+solar.cov.bg <- s.bg %>%
   mutate(group = c(rep(seq(1,10,1), each = floor(nrow(s.bg)/10)),rep(10,8)))
 
 v_name <- c("(Intercept)",
             "Transmission dist",
-            "Land acquisition",
-            "Road dist", 
+            "Road dist",
             "Substation dist",
             "Slope",
-            "Population density", 
-            "RPS",
-            
+            "Population density",
+            "FER incentive",
+
             "Unemployment",
-            "Minority", 
-            "Poverty", 
-            
-            "Forest", 
-            "Grassland", 
-            "Shrubland", 
-            "Riparian", 
-            "Vegetated", 
-            "Agriculture", 
-            "Developed", 
-            # "Ohter lands",
-            
-            "Northeast",
-            "Midwest",
-            "West",
-            "South",
-            "Texas",
-            # "Mtwest",
-            
+            "Foreign born",
+            "Poverty",
+
+            "Forest",
+            "Grassland",
+            "Shrubland",
+            "Riparian",
+            "Vegetated",
+            "Agriculture",
+            "Developed",
+            "Other lands",
+
+            "Nord-Ovest",
+            "Nord-Est",
+            "Centro",
+            "Sud",
+            "Isole",
+
             "Environmental score",
             "Capacity factor",
             "Spatial lag")
@@ -43,52 +43,51 @@ v_name <- c("(Intercept)",
 rst_s <- data.frame()
 aic <- c()
 for(i in 1:10){
-  s_dat <- solar.cov.bg %>% 
-    filter(group == i) %>% 
-    dplyr::select(-group) %>% 
-    rbind(solar.cov.existing) %>% 
-    mutate(treat = factor(treat)) %>% 
+  s_dat <- solar.cov.bg %>%
+    filter(group == i) %>%
+    dplyr::select(-group) %>%
+    rbind(solar.cov.existing) %>%
+    mutate(treat = factor(treat)) %>%
     na.omit()
-  
-  glm1_solar <- glm(treat ~ tx + landAcq + roads + sub + slope + pop + rps + unemploy + minority + poverty + 
+
+  glm1_solar <- glm(treat ~ tx + roads + sub + slope + pop + fer + unemploy + foreignborn + poverty +
                       lulc_forest + lulc_grassland + lulc_shrubland + lulc_riparian + lulc_sparse + lulc_agriculture + lulc_developed + lulc_other +
-                      region_ne + region_mw + region_w + region_s + region_tex + region_mtw +
-                      env + cf + lag, 
+                      region_nordovest + region_nordest + region_centro + region_sud + region_isole +
+                      env + cf + lag,
                     data=s_dat, family = binomial(link="logit"))
-  
-  tp <- summary(glm1_solar)$coefficients %>% 
-    as.data.frame() %>% 
-    mutate(var = v_name) %>% 
+
+  tp <- summary(glm1_solar)$coefficients %>%
+    as.data.frame() %>%
+    mutate(var = v_name) %>%
     mutate(color = ifelse(`Pr(>|z|)` < 0.05, "Y", "N")) %>%
-    dplyr::select(-"z value",-"Pr(>|z|)") %>% 
-    # tibble::rownames_to_column("var") %>% 
-    filter(!var == "(Intercept)") %>% 
+    dplyr::select(-"z value",-"Pr(>|z|)") %>%
+    filter(!var == "(Intercept)") %>%
     rename(se = "Std. Error",
-           pe = Estimate) %>% 
-    mutate(Group = i) 
-  
-  rst_s <- tp %>% 
+           pe = Estimate) %>%
+    mutate(Group = i)
+
+  rst_s <- tp %>%
     rbind(rst_s)
-  
+
   aic[i] <- glm1_solar$aic
-  
+
 }
 
 
-s_dat <- solar.cov.bg %>% 
-  filter(group == which(aic == sort(aic)[5])) %>% 
-  dplyr::select(-group) %>% 
-  rbind(solar.cov.existing) %>% 
-  mutate(treat = factor(treat)) %>% 
+s_dat <- solar.cov.bg %>%
+  filter(group == which(aic == sort(aic)[5])) %>%
+  dplyr::select(-group) %>%
+  rbind(solar.cov.existing) %>%
+  mutate(treat = factor(treat)) %>%
   na.omit()
 
 write.csv(s_dat, "./derived/solar.csv", row.names = FALSE)
 
 
-glm1_solar <- glm(treat ~ tx + landAcq + roads + sub + slope + pop + rps + unemploy + minority + poverty + 
+glm1_solar <- glm(treat ~ tx + roads + sub + slope + pop + fer + unemploy + foreignborn + poverty +
                     lulc_forest + lulc_grassland + lulc_shrubland + lulc_riparian + lulc_sparse + lulc_agriculture + lulc_developed + lulc_other +
-                    region_ne + region_mw + region_w + region_s + region_tex + region_mtw +
-                    env + cf + lag, 
+                    region_nordovest + region_nordest + region_centro + region_sud + region_isole +
+                    env + cf + lag,
                   data=s_dat, family = binomial(link="logit"))
 
 
@@ -101,9 +100,9 @@ tc_kfold <- trainControl(method = "cv", number = 10, returnResamp="all",
                          savePredictions = TRUE, classProbs = TRUE,
                          summaryFunction = twoClassSummary)
 
-region_model <- make.names(treat) ~ tx + landAcq + roads + sub + slope + pop + rps + unemploy + minority + poverty + 
+region_model <- make.names(treat) ~ tx + roads + sub + slope + pop + fer + unemploy + foreignborn + poverty +
   lulc_forest + lulc_grassland + lulc_shrubland + lulc_riparian + lulc_sparse + lulc_agriculture + lulc_developed + lulc_other +
-  region_ne + region_mw + region_w + region_s + region_tex + region_mtw +
+  region_nordovest + region_nordest + region_centro + region_sud + region_isole +
   env + cf + lag
 
 
@@ -148,7 +147,7 @@ mdl_solarxg = train(form = region_model, data=s_dat,
 
 varimp_solarxg <- varImp(mdl_solarxg)
 solar.pg.xg <- predict(object = solar_future, mdl_solarxg, type = "prob", ext=extent(solar_future), progress='text', index=2)
-writeRaster(solar.pg.xg, "./derived/pred_xg_s.tif", overwrite=TRUE)  
+writeRaster(solar.pg.xg, "./derived/pred_xg_s.tif", overwrite=TRUE)
 
 
 #### RF
@@ -175,9 +174,9 @@ solar_resamps <- resamples(solarmodel_list)
 
 
 ### wind
-wind.cov.existing <- read_csv("./derived/existing_cov_wind.csv") 
-w.bg <- read_csv("./derived/bg_cov_wind.csv") 
-wind.cov.bg <- w.bg %>% 
+wind.cov.existing <- read_csv("./derived/existing_cov_wind.csv")
+w.bg <- read_csv("./derived/bg_cov_wind.csv")
+wind.cov.bg <- w.bg %>%
   mutate(group = c(rep(seq(1,10,1), each = floor(nrow(w.bg)/10)),rep(10,0)))
 
 
@@ -185,52 +184,51 @@ wind.cov.bg <- w.bg %>%
 rst_w <- data.frame()
 aic <- c()
 for(i in 1:10){
-  w_dat <- wind.cov.bg %>% 
-    filter(group == i) %>% 
-    dplyr::select(-group) %>% 
-    rbind(wind.cov.existing) %>% 
-    mutate(treat = factor(treat)) %>% 
+  w_dat <- wind.cov.bg %>%
+    filter(group == i) %>%
+    dplyr::select(-group) %>%
+    rbind(wind.cov.existing) %>%
+    mutate(treat = factor(treat)) %>%
     na.omit()
-  
-  glm1_wind <- glm(treat ~ tx + landAcq + roads + sub + slope + pop + rps + unemploy + minority + poverty + 
+
+  glm1_wind <- glm(treat ~ tx + roads + sub + slope + pop + fer + unemploy + foreignborn + poverty +
                       lulc_forest + lulc_grassland + lulc_shrubland + lulc_riparian + lulc_sparse + lulc_agriculture + lulc_developed + lulc_other +
-                      region_ne + region_mw + region_w + region_s + region_tex + region_mtw +
-                      env + cf + lag, 
+                      region_nordovest + region_nordest + region_centro + region_sud + region_isole +
+                      env + cf + lag,
                     data=w_dat, family = binomial(link="logit"))
-  
-  tp <- summary(glm1_wind)$coefficients %>% 
-    as.data.frame() %>% 
-    mutate(var = v_name) %>% 
+
+  tp <- summary(glm1_wind)$coefficients %>%
+    as.data.frame() %>%
+    mutate(var = v_name) %>%
     mutate(color = ifelse(`Pr(>|z|)` < 0.05, "Y", "N")) %>%
-    dplyr::select(-"z value",-"Pr(>|z|)") %>% 
-    # tibble::rownames_to_column("var") %>% 
-    filter(!var == "(Intercept)") %>% 
+    dplyr::select(-"z value",-"Pr(>|z|)") %>%
+    filter(!var == "(Intercept)") %>%
     rename(se = "Std. Error",
-           pe = Estimate) %>% 
-    mutate(Group = i) 
-  
-  rst_w <- tp %>% 
+           pe = Estimate) %>%
+    mutate(Group = i)
+
+  rst_w <- tp %>%
     rbind(rst_w)
-  
+
   aic[i] <- glm1_wind$aic
-  
+
 }
 
 
-w_dat <- wind.cov.bg %>% 
-  filter(group == which(aic == sort(aic)[5])) %>% 
-  dplyr::select(-group) %>% 
-  rbind(wind.cov.existing) %>% 
-  mutate(treat = factor(treat)) %>% 
+w_dat <- wind.cov.bg %>%
+  filter(group == which(aic == sort(aic)[5])) %>%
+  dplyr::select(-group) %>%
+  rbind(wind.cov.existing) %>%
+  mutate(treat = factor(treat)) %>%
   na.omit()
 
 write.csv(w_dat, "./derived/wind.csv", row.names = FALSE)
 
 
-glm1_wind <- glm(treat ~ tx + landAcq + roads + sub + slope + pop + rps + unemploy + minority + poverty + 
+glm1_wind <- glm(treat ~ tx + roads + sub + slope + pop + fer + unemploy + foreignborn + poverty +
                     lulc_forest + lulc_grassland + lulc_shrubland + lulc_riparian + lulc_sparse + lulc_agriculture + lulc_developed + lulc_other +
-                    region_ne + region_mw + region_w + region_s + region_tex + region_mtw +
-                    env + cf + lag, 
+                    region_nordovest + region_nordest + region_centro + region_sud + region_isole +
+                    env + cf + lag,
                   data=w_dat, family = binomial(link="logit"))
 
 
@@ -279,7 +277,7 @@ mdl_windxg = train(form = region_model, data=w_dat,
 
 varimp_windxg <- varImp(mdl_windxg)
 wind.pg.xg <- predict(object = wind_future, mdl_windxg, type = "prob", ext=extent(wind_future), progress='text', index=2)
-writeRaster(wind.pg.xg, "./derived/pred_xg_w.tif", overwrite=TRUE)  
+writeRaster(wind.pg.xg, "./derived/pred_xg_w.tif", overwrite=TRUE)
 
 
 #### RF
@@ -307,81 +305,79 @@ wind_resamps <- resamples(windmodel_list)
 
 
 imp <- rbind(
-  varimp_windrf[[1]] %>% 
-    as.data.frame() %>% 
-    rownames_to_column() %>% 
-    dplyr::select(-X0) %>% 
+  varimp_windrf[[1]] %>%
+    as.data.frame() %>%
+    rownames_to_column() %>%
+    dplyr::select(-X0) %>%
     mutate(model = "RF",
-           tech = "Wind") %>% 
+           tech = "Wind") %>%
     rename(Overall = X1),
-  varimp_windxg[[1]] %>% 
-    as.data.frame() %>% 
-    rownames_to_column() %>% 
+  varimp_windxg[[1]] %>%
+    as.data.frame() %>%
+    rownames_to_column() %>%
     mutate(model = "XGBoost",
            tech = "Wind"),
-  varimp_windlasso[[1]] %>% 
-    as.data.frame() %>% 
-    rownames_to_column() %>% 
+  varimp_windlasso[[1]] %>%
+    as.data.frame() %>%
+    rownames_to_column() %>%
     mutate(model = "Lasso",
            tech = "Wind"),
-  varimp_windglm[[1]] %>% 
-    as.data.frame() %>% 
-    rownames_to_column() %>% 
+  varimp_windglm[[1]] %>%
+    as.data.frame() %>%
+    rownames_to_column() %>%
     mutate(model = "GLM",
            tech = "Wind"),
-  
-  varimp_solarrf[[1]] %>% 
-    as.data.frame() %>% 
-    rownames_to_column() %>% 
-    dplyr::select(-X0) %>% 
+
+  varimp_solarrf[[1]] %>%
+    as.data.frame() %>%
+    rownames_to_column() %>%
+    dplyr::select(-X0) %>%
     mutate(model = "RF",
-           tech = "Solar") %>% 
+           tech = "Solar") %>%
     rename(Overall = X1),
-  varimp_solarxg[[1]] %>% 
-    as.data.frame() %>% 
-    rownames_to_column() %>% 
+  varimp_solarxg[[1]] %>%
+    as.data.frame() %>%
+    rownames_to_column() %>%
     mutate(model = "XGBoost",
            tech = "Solar"),
-  varimp_solarlasso[[1]] %>% 
-    as.data.frame() %>% 
-    rownames_to_column() %>% 
+  varimp_solarlasso[[1]] %>%
+    as.data.frame() %>%
+    rownames_to_column() %>%
     mutate(model = "Lasso",
            tech = "Solar"),
-  varimp_solarglm[[1]] %>% 
-    as.data.frame() %>% 
-    rownames_to_column() %>% 
+  varimp_solarglm[[1]] %>%
+    as.data.frame() %>%
+    rownames_to_column() %>%
     mutate(model = "GLM",
            tech = "Solar")
-) %>% 
+) %>%
   mutate(rowname = recode(
     rowname,
-    "tx" = "Transmission dist",
-    "landAcq" = "Land acquisition",
-    "roads" = "Road dist",
-    "sub" = "Substation dist",
-    "slope" = "Slope",
-    "pop" = "Population density",
-    "rps" = "RPS target",
-    "unemploy" = "Unemployment",
-    "minority" = "Minority",
-    "poverty" = "Poverty",
-    "lulc_forest" = "Forest",
-    "lulc_grassland" = "Grassland",
-    "lulc_shrubland" = "Shrubland",
-    "lulc_riparian" = "Riparian",
-    "lulc_sparse" = "Sparsely vegetated",
-    "lulc_agriculture" = "Agriculture",
-    "lulc_developed" = "Developed",
-    "lulc_other" = "Otherland",
-    "region_ne" = "Northeast",
-    "region_mw" = "Midwest",
-    "region_w" = "West",
-    "region_s" = "South",
-    "region_tex" = "Texas",
-    "region_mtw" = "Mountain West",
-    "env" = "Environmental score",
-    "cf" = "Capacity factor",
-    "lag" = "Spatial lag"
+    "tx"             = "Transmission dist",
+    "roads"          = "Road dist",
+    "sub"            = "Substation dist",
+    "slope"          = "Slope",
+    "pop"            = "Population density",
+    "fer"            = "FER incentive",
+    "unemploy"       = "Unemployment",
+    "foreignborn"    = "Foreign born",
+    "poverty"        = "Poverty",
+    "lulc_forest"       = "Forest",
+    "lulc_grassland"    = "Grassland",
+    "lulc_shrubland"    = "Shrubland",
+    "lulc_riparian"     = "Riparian",
+    "lulc_sparse"       = "Sparsely vegetated",
+    "lulc_agriculture"  = "Agriculture",
+    "lulc_developed"    = "Developed",
+    "lulc_other"        = "Otherland",
+    "region_nordovest"  = "Nord-Ovest",
+    "region_nordest"    = "Nord-Est",
+    "region_centro"     = "Centro",
+    "region_sud"        = "Sud",
+    "region_isole"      = "Isole",
+    "env"            = "Environmental score",
+    "cf"             = "Capacity factor",
+    "lag"            = "Spatial lag"
   ))
 
 save(imp, solar_resamps, wind_resamps, rst_s, rst_w, file = "./derived/model_results.RData")
