@@ -49,6 +49,49 @@ roads_rast <- rasterize(vect(roads_sf) |> project(crs(base_ras)), base_ras, fiel
 save_var(distance(roads_rast) |> snap(), "roads_qgis.tif")
 
 
+# ── 3b. Distance to transmission lines & substations (OSM) ───────────────────
+# TERNA does not publish GIS downloads. OSM has comprehensive tagging of the
+# Italian power grid (power=line, power=substation) — same cached PBF used above.
+message("3b. Transmission lines & substations distance (OSM)")
+
+# Transmission lines ≥ 110 kV
+tx_sf <- osmextract::oe_get(
+  "Italy",
+  layer              = "lines",
+  query              = "SELECT geometry, voltage FROM lines WHERE power = 'line'",
+  download_directory = cache_path,
+  quiet              = TRUE
+) |> filter(!is.na(voltage))
+# voltage field is a string in OSM (e.g. "132000", "220000;380000")
+tx_sf <- tx_sf |>
+  mutate(v = as.numeric(gsub(";.*", "", voltage))) |>
+  filter(v >= 110000)
+tx_rast <- rasterize(vect(tx_sf) |> project(crs(base_ras)), base_ras, field = 1)
+save_var(distance(tx_rast) |> snap(), "transmission_110_qgis.tif")
+# Planned lines not available in OSM — copy current as placeholder until
+# TERNA's Grid Development Plan data becomes available
+save_var(distance(tx_rast) |> snap(), "transmission_110_wPlanned.tif")
+
+# Substations — OSM stores them as both points and multipolygons
+subs_pts  <- osmextract::oe_get(
+  "Italy", layer = "points",
+  query = "SELECT geometry FROM points WHERE power = 'substation'",
+  download_directory = cache_path, quiet = TRUE
+)
+subs_poly <- osmextract::oe_get(
+  "Italy", layer = "multipolygons",
+  query = "SELECT geometry FROM multipolygons WHERE power = 'substation'",
+  download_directory = cache_path, quiet = TRUE
+)
+subs_sf    <- bind_rows(
+  st_centroid(subs_poly) |> select(geometry),
+  subs_pts |> select(geometry)
+)
+subs_rast  <- rasterize(vect(subs_sf) |> project(crs(base_ras)), base_ras, field = 1)
+save_var(distance(subs_rast) |> snap(), "substations_110_qgis.tif")
+save_var(distance(subs_rast) |> snap(), "substations_110_wPlanned.tif")
+
+
 # ── 4. Solar capacity factor (WorldClim solar radiation proxy) ────────────────
 # Source: WorldClim 2.1 monthly solar radiation (kJ/m²/day), 0.5 arc-min
 # Note: replace with PVGIS data for production analysis —
@@ -154,60 +197,62 @@ save_var(env_score, "env_impactScore_wind.tif")
 # ══ MANUAL DOWNLOADS REQUIRED ════════════════════════════════════════════════
 message("
 ================================================================
-  3 variable groups still require manual downloads
+  2 variable groups still require manual downloads
 ================================================================
 
-── A. TRANSMISSION LINES & SUBSTATIONS (TERNA) ─────────────────
-   Download GIS data (shapefile / GeoJSON) from:
-   https://www.terna.it/it/sistema-elettrico/rete/piano-sviluppo-rete
+── A. SOCIOECONOMIC INDICATORS (ISTAT) ─────────────────────────
 
-   Save to: data/raw_downloads/terna_lines.shp (and terna_substations.shp)
-   Then run:
+  FOREIGN-BORN % — 2021 permanent census, municipality level:
+    1. Go to: https://esploradati.istat.it/databrowser/
+    2. Navigate: Censimento Permanente Popolazione > Popolazione per
+       cittadinanza > Comuni
+    3. Download as CSV; the column for non-Italian citizens gives foreign-born %.
+    4. Save to: data/raw_downloads/istat_foreignborn.csv
 
-     lines      <- st_read('data/raw_downloads/terna_lines.shp') |>
-                     filter(VOLTAGE >= 110) |>
-                     st_transform(italy_crs) |> vect()
-     lines_rast <- rasterize(lines, base_ras, field = 1)
-     writeRaster(distance(lines_rast) |> snap(),
-                 'data/processed_data/variables/transmission_110_qgis.tif')
-     # Repeat for:
-     #   substations → substations_110_qgis.tif
-     #   planned lines → transmission_110_wPlanned.tif
-     #   planned substations → substations_110_wPlanned.tif
+  UNEMPLOYMENT RATE — Labour Force Survey (Rilevazione Forze Lavoro):
+    Note: LFS data is only available at provincial level, not municipality.
+    1. Go to: http://dati.istat.it/ > Mercato del lavoro > Occupati e disoccupati
+    2. Select: provinces (province), unemployment rate (tasso di disoccupazione)
+    3. Download as CSV.
+    4. Save to: data/raw_downloads/istat_unemp.csv
+    5. Join to provinces via giscoR::gisco_get_nuts(nuts_level='3', country='IT')
 
-── B. SOCIOECONOMIC INDICATORS (ISTAT) ─────────────────────────
-   Download municipality-level census indicators (unemployment, poverty,
-   foreign-born %) from the ISTAT permanent census data explorer:
-   https://esploradati.istat.it/databrowser/
+  POVERTY PROXY — municipal taxable income (MEF):
+    Unemployment is unavailable at municipality level; use mean taxable income
+    as poverty proxy (lower income = higher poverty).
+    1. Go to: https://www1.finanze.gov.it/finanze/analisi_stat/public/index.php
+    2. Download > Dichiarazioni > Persone fisiche > Comuni
+    3. Save to: data/raw_downloads/mef_income.csv
 
-   Join to municipality boundaries via giscoR, then rasterize:
+  After downloading, rasterize with:
+    comuni <- giscoR::gisco_get_communes(country = 'IT', year = '2020') |>
+                st_transform(italy_crs)
+    comuni <- comuni |> left_join(istat_data, by = c('COMM_ID' = 'PRO_COM_T'))
+    writeRaster(rasterize(vect(comuni), base_ras, field = 'foreignborn_pct') |> snap(),
+                'data/processed_data/variables/svi_foreignborn.tif')
+    # Repeat for svi_unemp.tif (joined at province level) and svi_pov.tif
 
-     comuni <- giscoR::gisco_get_communes(country = 'IT', year = '2020') |>
-                 st_transform(italy_crs)
-     comuni <- comuni |> left_join(istat_data, by = c('COMM_ID' = 'municipality_code'))
-     writeRaster(rasterize(vect(comuni), base_ras, field = 'unemployment_rate') |> snap(),
-                 'data/processed_data/variables/svi_unemp.tif')
-     # Repeat for svi_pov.tif and svi_foreignborn.tif
+── B. NATURA 2000 (for full environmental impact score) ─────────
 
-── C. NATURA 2000 (for full environmental impact score) ─────────
-   Download the European Natura 2000 shapefile from EEA:
-   https://www.eea.europa.eu/data-and-maps/data/natura-14
+  Direct download (no login required):
+    Shapefile: https://cmshare.eea.europa.eu/s/HHGPnNsjqq5BdEa/download
+    GeoPackage: https://www.eea.europa.eu/data-and-maps/data/natura-13/natura-2000-spatial-data/natura-2000-spatial-lite-1
 
-   Filter to Italy (SITECODE starts with 'IT'), then add to env score:
+  Save the extracted shapefile to: data/raw_downloads/Natura2000_end2021.shp
+  Then run:
 
-     natura <- st_read('data/raw_downloads/Natura2000_end2021.shp') |>
-                 filter(startsWith(SITECODE, 'IT')) |>
-                 st_transform(italy_crs) |> vect()
-     natura_rast  <- rasterize(natura, base_ras, field = 1)
-     dist_natura  <- distance(natura_rast) |> snap()
-     # Invert: closer to Natura 2000 = higher sensitivity
-     dist_norm    <- 1 - dist_natura / global(dist_natura, 'max', na.rm=TRUE)$max
-     slope_norm   <- rast('data/processed_data/variables/slope.tif') /
-                       global(rast('data/processed_data/variables/slope.tif'),
-                              'max', na.rm=TRUE)$max
-     env_score    <- (dist_norm * 0.7 + slope_norm * 0.3) |> mask(base_ras)
-     writeRaster(env_score, 'data/processed_data/variables/env_impactScore_solar.tif')
-     writeRaster(env_score, 'data/processed_data/variables/env_impactScore_wind.tif')
+    natura <- st_read('data/raw_downloads/Natura2000_end2021.shp') |>
+                filter(startsWith(SITECODE, 'IT')) |>
+                st_transform(italy_crs) |> vect()
+    natura_rast <- rasterize(natura, base_ras, field = 1)
+    dist_natura <- distance(natura_rast) |> snap()
+    dist_norm   <- 1 - dist_natura / global(dist_natura, 'max', na.rm=TRUE)$max
+    slope_norm  <- rast('data/processed_data/variables/slope.tif') /
+                     global(rast('data/processed_data/variables/slope.tif'),
+                            'max', na.rm=TRUE)$max
+    env_score   <- (dist_norm * 0.7 + slope_norm * 0.3) |> mask(base_ras)
+    writeRaster(env_score, 'data/processed_data/variables/env_impactScore_solar.tif')
+    writeRaster(env_score, 'data/processed_data/variables/env_impactScore_wind.tif')
 
 ================================================================
 ")
