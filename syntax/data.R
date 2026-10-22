@@ -10,8 +10,8 @@ w_roi <- rast("./derived/wind_absence_roi.tif")
 
 # predictor analysis
 load("./derived/model_results.RData")  # imp, solar_resamps, wind_resamps, rst_s, rst_w
-s_dat <- read_csv("./derived/solar.csv")
-w_dat <- read_csv("./derived/wind.csv")
+s_dat <- read_csv("./derived/solar.csv") %>% mutate(treat = as.integer(treat == "X1"))
+w_dat <- read_csv("./derived/wind.csv") %>% mutate(treat = as.integer(treat == "X1"))
 
 
 # prediction
@@ -38,7 +38,7 @@ terra::writeRaster(rast(results_masked), "./derived/results_masked.tif", overwri
 # Fetch the 5 NUTS-1 boundaries (same call used in function.R for NUTS-2)
 rgn <- giscoR::gisco_get_nuts(country = "IT", nuts_level = "1",
                                year = "2021", resolution = "03") |>
-  st_transform(crs = as.integer(gsub(".*:","", projection@projargs))) |>
+  st_transform(crs = 3035) |>
   rename(region = NUTS_ID) |>
   mutate(region = recode(region,
                          "ITC" = "Nord-Ovest",
@@ -50,7 +50,7 @@ rgn <- giscoR::gisco_get_nuts(country = "IT", nuts_level = "1",
 # bring into the analysis CRS used by prediction rasters
 rgn_vect <- rgn %>%
   mutate(id = 1:5) %>%
-  st_transform(crs = projection) %>%
+  st_transform(crs = 3035) %>%
   terra::vect()
 
 models <- c("GLM","Lasso","RF","XGBoost")

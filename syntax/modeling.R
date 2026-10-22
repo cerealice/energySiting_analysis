@@ -5,38 +5,40 @@ source("./syntax/function.R")
 solar.cov.existing <- read_csv("./derived/existing_cov_solar.csv")
 s.bg <- read_csv("./derived/bg_cov_solar.csv")
 solar.cov.bg <- s.bg %>%
-  mutate(group = c(rep(seq(1,10,1), each = floor(nrow(s.bg)/10)),rep(10,8)))
+  mutate(group = c(rep(seq(1,10,1), each = floor(nrow(s.bg)/10)),
+                   rep(10, nrow(s.bg) %% 10)))
 
-v_name <- c("(Intercept)",
-            "Transmission dist",
-            "Road dist",
-            "Substation dist",
-            "Slope",
-            "Population density",
-            "FER incentive",
-
-            "Unemployment",
-            "Foreign born",
-            "Poverty",
-
-            "Forest",
-            "Grassland",
-            "Shrubland",
-            "Riparian",
-            "Vegetated",
-            "Agriculture",
-            "Developed",
-            "Other lands",
-
-            "Nord-Ovest",
-            "Nord-Est",
-            "Centro",
-            "Sud",
-            "Isole",
-
-            "Environmental score",
-            "Capacity factor",
-            "Spatial lag")
+# Named lookup: coefficient rowname → display label.
+# Using rownames_to_column() + recode() avoids hard-coded positional matching,
+# so dropped variables (rank-deficient columns) don't misalign the labels.
+var_labels <- c(
+  "(Intercept)"      = "(Intercept)",
+  "tx"               = "Transmission dist",
+  "roads"            = "Road dist",
+  "sub"              = "Substation dist",
+  "slope"            = "Slope",
+  "pop"              = "Population density",
+  "fer"              = "FER incentive",
+  "unemploy"         = "Unemployment",
+  "foreignborn"      = "Foreign born",
+  "poverty"          = "Poverty",
+  "lulc_forest"      = "Forest",
+  "lulc_grassland"   = "Grassland",
+  "lulc_shrubland"   = "Shrubland",
+  "lulc_riparian"    = "Riparian",
+  "lulc_sparse"      = "Vegetated",
+  "lulc_agriculture" = "Agriculture",
+  "lulc_developed"   = "Developed",
+  "lulc_other"       = "Other lands",
+  "region_nordovest" = "Nord-Ovest",
+  "region_nordest"   = "Nord-Est",
+  "region_centro"    = "Centro",
+  "region_sud"       = "Sud",
+  "region_isole"     = "Isole",
+  "env"              = "Environmental score",
+  "cf"               = "Capacity factor",
+  "lag"              = "Spatial lag"
+)
 
 
 ### combined
@@ -48,7 +50,8 @@ for(i in 1:10){
     dplyr::select(-group) %>%
     rbind(solar.cov.existing) %>%
     mutate(treat = factor(treat)) %>%
-    na.omit()
+    na.omit() %>%
+    mutate(treat = factor(make.names(treat)))
 
   glm1_solar <- glm(treat ~ tx + roads + sub + slope + pop + fer + unemploy + foreignborn + poverty +
                       lulc_forest + lulc_grassland + lulc_shrubland + lulc_riparian + lulc_sparse + lulc_agriculture + lulc_developed + lulc_other +
@@ -58,12 +61,12 @@ for(i in 1:10){
 
   tp <- summary(glm1_solar)$coefficients %>%
     as.data.frame() %>%
-    mutate(var = v_name) %>%
-    mutate(color = ifelse(`Pr(>|z|)` < 0.05, "Y", "N")) %>%
-    dplyr::select(-"z value",-"Pr(>|z|)") %>%
-    filter(!var == "(Intercept)") %>%
-    rename(se = "Std. Error",
-           pe = Estimate) %>%
+    rownames_to_column("var") %>%
+    mutate(var   = recode(var, !!!var_labels),
+           color = ifelse(`Pr(>|z|)` < 0.05, "Y", "N")) %>%
+    dplyr::select(-"z value", -"Pr(>|z|)") %>%
+    filter(var != "(Intercept)") %>%
+    rename(se = "Std. Error", pe = Estimate) %>%
     mutate(Group = i)
 
   rst_s <- tp %>%
@@ -79,7 +82,8 @@ s_dat <- solar.cov.bg %>%
   dplyr::select(-group) %>%
   rbind(solar.cov.existing) %>%
   mutate(treat = factor(treat)) %>%
-  na.omit()
+  na.omit() %>%
+  mutate(treat = factor(make.names(treat)))   # "0"/"1" → "X0"/"X1" (valid R names for caret)
 
 write.csv(s_dat, "./derived/solar.csv", row.names = FALSE)
 
@@ -100,7 +104,7 @@ tc_kfold <- trainControl(method = "cv", number = 10, returnResamp="all",
                          savePredictions = TRUE, classProbs = TRUE,
                          summaryFunction = twoClassSummary)
 
-region_model <- make.names(treat) ~ tx + roads + sub + slope + pop + fer + unemploy + foreignborn + poverty +
+region_model <- treat ~ tx + roads + sub + slope + pop + fer + unemploy + foreignborn + poverty +
   lulc_forest + lulc_grassland + lulc_shrubland + lulc_riparian + lulc_sparse + lulc_agriculture + lulc_developed + lulc_other +
   region_nordovest + region_nordest + region_centro + region_sud + region_isole +
   env + cf + lag
@@ -128,22 +132,20 @@ varimp_solarlasso <- varImp(mdl_solarlasso)
 solar.pg.lasso <- predict(object = solar_future, mdl_solarlasso, type = "prob", ext=extent(solar_future), progress='text', index=2)
 writeRaster(solar.pg.lasso, "./derived/pred_lasso_s.tif", overwrite=TRUE)
 
-#### xgbTree
-library(xgboost)
+#### GBM (replaces xgbTree: caret's xgbTree is incompatible with xgboost >= 2.0)
+librarian::shelf("gbm")
 tune_grid <- expand.grid(
-  nrounds = c(50),       # Number of boosting iterations
-  max_depth = c(3, 6),           # Maximum depth of trees
-  eta = c(0.01, 0.1),         # Learning rate
-  gamma = c(1),               # Minimum loss reduction required
-  colsample_bytree = c(0.6),# Fraction of features used per tree
-  min_child_weight = c(1, 5),
-  subsample = c(0.6)        # Fraction of samples used per tree
+  n.trees           = c(50, 100),
+  interaction.depth = c(3, 6),
+  shrinkage         = c(0.01, 0.1),
+  n.minobsinnode    = c(5, 10)
 )
 
 mdl_solarxg = train(form = region_model, data=s_dat,
-                    method="xgbTree", trControl = tc_kfold,
+                    method="gbm", trControl = tc_kfold,
                     tuneGrid = tune_grid,
-                    na.action = na.omit)
+                    na.action = na.omit,
+                    verbose = FALSE)
 
 varimp_solarxg <- varImp(mdl_solarxg)
 solar.pg.xg <- predict(object = solar_future, mdl_solarxg, type = "prob", ext=extent(solar_future), progress='text', index=2)
@@ -177,7 +179,8 @@ solar_resamps <- resamples(solarmodel_list)
 wind.cov.existing <- read_csv("./derived/existing_cov_wind.csv")
 w.bg <- read_csv("./derived/bg_cov_wind.csv")
 wind.cov.bg <- w.bg %>%
-  mutate(group = c(rep(seq(1,10,1), each = floor(nrow(w.bg)/10)),rep(10,0)))
+  mutate(group = c(rep(seq(1,10,1), each = floor(nrow(w.bg)/10)),
+                   rep(10, nrow(w.bg) %% 10)))
 
 
 ### combined
@@ -189,7 +192,8 @@ for(i in 1:10){
     dplyr::select(-group) %>%
     rbind(wind.cov.existing) %>%
     mutate(treat = factor(treat)) %>%
-    na.omit()
+    na.omit() %>%
+    mutate(treat = factor(make.names(treat)))
 
   glm1_wind <- glm(treat ~ tx + roads + sub + slope + pop + fer + unemploy + foreignborn + poverty +
                       lulc_forest + lulc_grassland + lulc_shrubland + lulc_riparian + lulc_sparse + lulc_agriculture + lulc_developed + lulc_other +
@@ -199,12 +203,12 @@ for(i in 1:10){
 
   tp <- summary(glm1_wind)$coefficients %>%
     as.data.frame() %>%
-    mutate(var = v_name) %>%
-    mutate(color = ifelse(`Pr(>|z|)` < 0.05, "Y", "N")) %>%
-    dplyr::select(-"z value",-"Pr(>|z|)") %>%
-    filter(!var == "(Intercept)") %>%
-    rename(se = "Std. Error",
-           pe = Estimate) %>%
+    rownames_to_column("var") %>%
+    mutate(var   = recode(var, !!!var_labels),
+           color = ifelse(`Pr(>|z|)` < 0.05, "Y", "N")) %>%
+    dplyr::select(-"z value", -"Pr(>|z|)") %>%
+    filter(var != "(Intercept)") %>%
+    rename(se = "Std. Error", pe = Estimate) %>%
     mutate(Group = i)
 
   rst_w <- tp %>%
@@ -220,7 +224,8 @@ w_dat <- wind.cov.bg %>%
   dplyr::select(-group) %>%
   rbind(wind.cov.existing) %>%
   mutate(treat = factor(treat)) %>%
-  na.omit()
+  na.omit() %>%
+  mutate(treat = factor(make.names(treat)))   # "0"/"1" → "X0"/"X1"
 
 write.csv(w_dat, "./derived/wind.csv", row.names = FALSE)
 
@@ -258,22 +263,19 @@ varimp_windlasso <- varImp(mdl_windlasso)
 wind.pg.lasso <- predict(object = wind_future, mdl_windlasso, type = "prob", ext=extent(wind_future), progress='text', index=2)
 writeRaster(wind.pg.lasso, "./derived/pred_lasso_w.tif", overwrite=TRUE)
 
-#### xgbTree
-library(xgboost)
+#### GBM (replaces xgbTree: caret's xgbTree is incompatible with xgboost >= 2.0)
 tune_grid <- expand.grid(
-  nrounds = c(50),       # Number of boosting iterations
-  max_depth = c(3, 6),           # Maximum depth of trees
-  eta = c(0.01, 0.1),         # Learning rate
-  gamma = c(1),               # Minimum loss reduction required
-  colsample_bytree = c(0.6),# Fraction of features used per tree
-  min_child_weight = c(1, 5),
-  subsample = c(0.6)        # Fraction of samples used per tree
+  n.trees           = c(50, 100),
+  interaction.depth = c(3, 6),
+  shrinkage         = c(0.01, 0.1),
+  n.minobsinnode    = c(5, 10)
 )
 
 mdl_windxg = train(form = region_model, data=w_dat,
-                    method="xgbTree", trControl = tc_kfold,
+                    method="gbm", trControl = tc_kfold,
                     tuneGrid = tune_grid,
-                    na.action = na.omit)
+                    na.action = na.omit,
+                    verbose = FALSE)
 
 varimp_windxg <- varImp(mdl_windxg)
 wind.pg.xg <- predict(object = wind_future, mdl_windxg, type = "prob", ext=extent(wind_future), progress='text', index=2)
