@@ -29,16 +29,12 @@ solar_sf <- solar_sf %>%
   st_join(region_boundaries %>% select(NUTS_NAME), join = st_within) %>%
   rename(state_code = NUTS_NAME)
 
-# Mask: all operating plants buffered 500 m — used to exclude existing sites
-# from absence-point sampling (equivalent to solar_mask in the US workflow).
+# Mask: all operating GSPT plants buffered 500 m
 solar_mask <- solar_sf %>%
   mutate(unique_id = row_number()) %>%
   st_buffer(dist = 500)
 
 # Locations: plants commissioned >=2017, capacity >=1 MW.
-# area_m2 is estimated at 10,000 m²/MW (~1 ha/MW: standard utility-scale solar
-# density including access roads and setbacks). radius_m replaces st_area() on
-# polygon footprints and is used in absence.R to size absence-point buffers.
 solar_locations <- solar_sf %>%
   filter(`Start year`    >= 2017,
          `Capacity (MW)` >= 1,
@@ -47,20 +43,70 @@ solar_locations <- solar_sf %>%
          area_m2   = `Capacity (MW)` * 10000,
          radius_m  = sqrt(area_m2 / pi))
 
-# Rasterize mask
+
+# ── SOLAR: Enrich with RSE Atlante Integrato (fv_pot_comunale_2021) ──────────
+# RSE provides total installed PV capacity (MW) per municipality as of 2021.
+# PV panels have 25–30 yr lifetimes — 2021 installations still active in 2026.
+# Threshold: >= 5 MW per comune to focus on utility-scale presence and filter
+# out communes whose totals reflect only rooftop aggregations.
+
+rse_solar_raw <- st_read(
+  "./data/d__temp_fv_pot_comunale_2021/fv_pot_comunale_2021.shp", quiet = TRUE
+) %>%
+  filter(VALORE >= 5) %>%
+  st_transform(italy_crs) %>%
+  st_centroid() %>%
+  st_join(region_boundaries %>% select(NUTS_NAME), join = st_within) %>%
+  rename(state_code = NUTS_NAME) %>%
+  filter(!is.na(state_code))
+
+# Discard RSE centroids already covered by GSPT mask (within 500 m)
+rse_solar_new <- rse_solar_raw %>%
+  mutate(in_mask = lengths(st_is_within_distance(., solar_mask, dist = 500)) > 0) %>%
+  filter(!in_mask) %>%
+  mutate(
+    `Capacity (MW)` = as.numeric(VALORE),
+    `Start year`    = 2021L,
+    area_m2         = as.numeric(VALORE) * 10000,
+    radius_m        = sqrt(area_m2 / pi)
+  )
+
+message("RSE solar: ", nrow(rse_solar_raw), " comuni >= 5 MW; ",
+        nrow(rse_solar_new), " new (not already in GSPT mask)")
+
+# Merge RSE into mask (so absence sampling avoids these locations too)
+solar_mask <- bind_rows(
+  solar_mask,
+  rse_solar_new %>%
+    st_buffer(dist = 500) %>%
+    mutate(unique_id = nrow(solar_mask) + row_number()) %>%
+    select(unique_id)
+)
+
+# Merge RSE into locations (additional presence points)
+solar_locations <- bind_rows(
+  solar_locations,
+  rse_solar_new %>%
+    select(state_code, `Capacity (MW)`, `Start year`, area_m2, radius_m) %>%
+    mutate(unique_id = nrow(solar_locations) + row_number())
+)
+
+message("Solar locations total: ", nrow(solar_locations),
+        " (GSPT + RSE Atlante)")
+
+
+# ── Rasterize solar ───────────────────────────────────────────────────────────
+
 solar_mask_rast <- solar_mask %>%
   terra::vect() %>%
   terra::rasterize(y = base_ras, field = "unique_id", touches = TRUE) %>%
   terra::mask(base_ras)
-# plot(solar_mask_rast)
 
-# Rasterize locations
 solar_location_rast <- solar_locations %>%
   terra::vect() %>%
   terra::rasterize(y = base_ras, field = "unique_id", touches = TRUE) %>%
   terra::mask(base_ras)
 
-# Save
 writeRaster(x = solar_mask_rast,
             filename = "./derived/solar_hull_existing_mask.tif",
             overwrite = TRUE)
@@ -74,10 +120,6 @@ write_csv(solar_locations %>% st_drop_geometry(),
 
 
 # ── WIND ───────────────────────────────────────────────────────────────────────
-
-# The GEM Wind Power Tracker is already at project level — no turbine
-# aggregation or convex-hull step needed (unlike USWTDB which stored individual
-# turbine points that had to be grouped by project name).
 
 wind_raw <- read_xlsx(wind_path, sheet = "Data") %>%
   filter(`Country/Area`      == "Italy",
@@ -94,15 +136,12 @@ wind_sf <- wind_sf %>%
   st_join(region_boundaries %>% select(NUTS_NAME), join = st_within) %>%
   rename(state_code = NUTS_NAME)
 
-# Mask: all operating plants buffered 500 m.
+# Mask: all operating GWPT plants buffered 500 m.
 wind_mask <- wind_sf %>%
   mutate(unique_id = row_number()) %>%
   st_buffer(dist = 500)
 
 # Locations: plants commissioned >=2017, capacity >=10 MW.
-# area_m2 estimated at 300,000 m²/MW (~3 MW/km²: typical onshore wind array
-# density including turbine spacing). This approximates the convex-hull area
-# computed from individual turbine points in the US workflow.
 wind_locations <- wind_sf %>%
   filter(`Start year`    >= 2017,
          `Capacity (MW)` >= 10,
@@ -112,20 +151,70 @@ wind_locations <- wind_sf %>%
          area_m2   = `Capacity (MW)` * 300000,
          radius_m  = sqrt(area_m2 / pi))
 
-# Rasterize mask
+
+# ── WIND: Enrich with RSE Atlante Integrato (eo_pot_comunale_2019) ───────────
+# RSE provides total installed wind capacity (MW) per municipality as of 2019.
+# Wind turbines have 20–25 yr lifetimes — 2019 installations still active 2026.
+# Threshold: >= 1 MW to include any meaningful wind presence.
+
+rse_wind_raw <- st_read(
+  "./data/d__temp_eo_pot_comunale_2019/eo_pot_comunale_2019.shp", quiet = TRUE
+) %>%
+  filter(VALORE >= 1) %>%
+  st_transform(italy_crs) %>%
+  st_centroid() %>%
+  st_join(region_boundaries %>% select(NUTS_NAME), join = st_within) %>%
+  rename(state_code = NUTS_NAME) %>%
+  filter(!is.na(state_code))
+
+# Discard RSE centroids already covered by GWPT mask (within 500 m)
+rse_wind_new <- rse_wind_raw %>%
+  mutate(in_mask = lengths(st_is_within_distance(., wind_mask, dist = 500)) > 0) %>%
+  filter(!in_mask) %>%
+  mutate(
+    `Capacity (MW)` = as.numeric(VALORE),
+    p_cap           = as.numeric(VALORE),
+    `Start year`    = 2019L,
+    area_m2         = as.numeric(VALORE) * 300000,
+    radius_m        = sqrt(area_m2 / pi)
+  )
+
+message("RSE wind: ", nrow(rse_wind_raw), " comuni >= 1 MW; ",
+        nrow(rse_wind_new), " new (not already in GWPT mask)")
+
+# Merge RSE into mask
+wind_mask <- bind_rows(
+  wind_mask,
+  rse_wind_new %>%
+    st_buffer(dist = 500) %>%
+    mutate(unique_id = nrow(wind_mask) + row_number()) %>%
+    select(unique_id)
+)
+
+# Merge RSE into locations
+wind_locations <- bind_rows(
+  wind_locations,
+  rse_wind_new %>%
+    select(state_code, `Capacity (MW)`, p_cap, `Start year`, area_m2, radius_m) %>%
+    mutate(unique_id = nrow(wind_locations) + row_number())
+)
+
+message("Wind locations total: ", nrow(wind_locations),
+        " (GWPT + RSE Atlante)")
+
+
+# ── Rasterize wind ────────────────────────────────────────────────────────────
+
 wind_mask_rast <- wind_mask %>%
   terra::vect() %>%
   terra::rasterize(y = base_ras, field = "unique_id", touches = TRUE) %>%
   terra::mask(base_ras)
-# plot(wind_mask_rast)
 
-# Rasterize locations
 wind_location_rast <- wind_locations %>%
   terra::vect() %>%
   terra::rasterize(y = base_ras, field = "unique_id", touches = TRUE) %>%
   terra::mask(base_ras)
 
-# Save
 writeRaster(x = wind_mask_rast,
             filename = "./derived/wind_hull_existing_mask.tif",
             overwrite = TRUE)
