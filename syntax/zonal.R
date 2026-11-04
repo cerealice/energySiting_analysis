@@ -14,12 +14,14 @@ wind_location_rast  <- rast("./derived/wind_hull_existing.tif")
 
 
 # ── Name layers to match modeling.R formulas ──────────────────────────────────
-# Italian stack: 22 shared predictors (land_acquisition and 6 US regions removed;
-# fer replaces rps; foreignborn replaces minority; 5 Italian regions added).
+# Italian stack: 24 shared predictors (land_acquisition and 6 US regions removed;
+# fer replaces rps; foreignborn replaces minority; 5 Italian regions added;
+# gdp_pc and inst_quality added from Zenodo DOI 10.5281/zenodo.11121790).
 names(coeff_stack) <- c(
   "tx", "roads", "sub",                                          # infrastructure
   "slope", "pop", "fer",                                         # biophysical / policy
-  "unemploy", "foreignborn", "poverty",                          # socioeconomic
+  "unemploy", "foreignborn", "poverty",                          # socioeconomic (ISTAT)
+  "gdp_pc", "inst_quality",                                      # socioeconomic (Zenodo)
   "lulc_forest", "lulc_grassland", "lulc_shrubland",
   "lulc_riparian", "lulc_sparse", "lulc_agriculture",
   "lulc_developed", "lulc_other",                                # land cover

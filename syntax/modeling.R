@@ -22,6 +22,8 @@ var_labels <- c(
   "unemploy"         = "Unemployment",
   "foreignborn"      = "Foreign born",
   "poverty"          = "Poverty",
+  "gdp_pc"           = "GDP per capita",
+  "inst_quality"     = "Institutional quality",
   "lulc_forest"      = "Forest",
   "lulc_grassland"   = "Grassland",
   "lulc_shrubland"   = "Shrubland",
@@ -40,6 +42,12 @@ var_labels <- c(
   "lag"              = "Spatial lag"
 )
 
+# Shared model formula — defined here so drop_na() can reference it in both loops
+region_model <- treat ~ tx + roads + sub + slope + pop + fer + unemploy + foreignborn + poverty + gdp_pc + inst_quality +
+  lulc_forest + lulc_grassland + lulc_shrubland + lulc_riparian + lulc_sparse + lulc_agriculture + lulc_developed + lulc_other +
+  region_nordovest + region_nordest + region_centro + region_sud + region_isole +
+  env + cf + lag
+
 
 ### combined
 rst_s <- data.frame()
@@ -50,10 +58,18 @@ for(i in 1:10){
     dplyr::select(-group) %>%
     rbind(solar.cov.existing) %>%
     mutate(treat = factor(treat)) %>%
-    na.omit() %>%
+    tidyr::drop_na(all_of(all.vars(region_model))) %>%
     mutate(treat = factor(make.names(treat)))
 
-  glm1_solar <- glm(treat ~ tx + roads + sub + slope + pop + fer + unemploy + foreignborn + poverty +
+  if (nrow(s_dat) == 0 || length(levels(s_dat$treat)) < 2) {
+    raw <- solar.cov.bg %>% filter(group == i) %>% select(-group) %>% rbind(solar.cov.existing)
+    na_cols <- sort(colSums(is.na(raw)), decreasing = TRUE)
+    na_cols <- na_cols[na_cols > 0]
+    stop(sprintf("Solar group %d: na.omit() removed all rows. Columns with NAs:\n%s",
+                 i, paste(sprintf("  %-25s %d", names(na_cols), na_cols), collapse = "\n")))
+  }
+
+  glm1_solar <- glm(treat ~ tx + roads + sub + slope + pop + fer + unemploy + foreignborn + poverty + gdp_pc + inst_quality +
                       lulc_forest + lulc_grassland + lulc_shrubland + lulc_riparian + lulc_sparse + lulc_agriculture + lulc_developed + lulc_other +
                       region_nordovest + region_nordest + region_centro + region_sud + region_isole +
                       env + cf + lag,
@@ -88,7 +104,7 @@ s_dat <- solar.cov.bg %>%
 write.csv(s_dat, "./derived/solar.csv", row.names = FALSE)
 
 
-glm1_solar <- glm(treat ~ tx + roads + sub + slope + pop + fer + unemploy + foreignborn + poverty +
+glm1_solar <- glm(treat ~ tx + roads + sub + slope + pop + fer + unemploy + foreignborn + poverty + gdp_pc + inst_quality +
                     lulc_forest + lulc_grassland + lulc_shrubland + lulc_riparian + lulc_sparse + lulc_agriculture + lulc_developed + lulc_other +
                     region_nordovest + region_nordest + region_centro + region_sud + region_isole +
                     env + cf + lag,
@@ -103,11 +119,6 @@ writeRaster(solar.pg, "./derived/pred_logReg_s.tif", overwrite=TRUE)
 tc_kfold <- trainControl(method = "cv", number = 10, returnResamp="all",
                          savePredictions = TRUE, classProbs = TRUE,
                          summaryFunction = twoClassSummary)
-
-region_model <- treat ~ tx + roads + sub + slope + pop + fer + unemploy + foreignborn + poverty +
-  lulc_forest + lulc_grassland + lulc_shrubland + lulc_riparian + lulc_sparse + lulc_agriculture + lulc_developed + lulc_other +
-  region_nordovest + region_nordest + region_centro + region_sud + region_isole +
-  env + cf + lag
 
 
 # ### GLM
@@ -192,10 +203,18 @@ for(i in 1:10){
     dplyr::select(-group) %>%
     rbind(wind.cov.existing) %>%
     mutate(treat = factor(treat)) %>%
-    na.omit() %>%
+    tidyr::drop_na(all_of(all.vars(region_model))) %>%
     mutate(treat = factor(make.names(treat)))
 
-  glm1_wind <- glm(treat ~ tx + roads + sub + slope + pop + fer + unemploy + foreignborn + poverty +
+  if (nrow(w_dat) == 0 || length(levels(w_dat$treat)) < 2) {
+    raw <- wind.cov.bg %>% filter(group == i) %>% select(-group) %>% rbind(wind.cov.existing)
+    na_cols <- sort(colSums(is.na(raw)), decreasing = TRUE)
+    na_cols <- na_cols[na_cols > 0]
+    stop(sprintf("Wind group %d: na.omit() removed all rows. Columns with NAs:\n%s",
+                 i, paste(sprintf("  %-25s %d", names(na_cols), na_cols), collapse = "\n")))
+  }
+
+  glm1_wind <- glm(treat ~ tx + roads + sub + slope + pop + fer + unemploy + foreignborn + poverty + gdp_pc + inst_quality +
                       lulc_forest + lulc_grassland + lulc_shrubland + lulc_riparian + lulc_sparse + lulc_agriculture + lulc_developed + lulc_other +
                       region_nordovest + region_nordest + region_centro + region_sud + region_isole +
                       env + cf + lag,
@@ -230,7 +249,7 @@ w_dat <- wind.cov.bg %>%
 write.csv(w_dat, "./derived/wind.csv", row.names = FALSE)
 
 
-glm1_wind <- glm(treat ~ tx + roads + sub + slope + pop + fer + unemploy + foreignborn + poverty +
+glm1_wind <- glm(treat ~ tx + roads + sub + slope + pop + fer + unemploy + foreignborn + poverty + gdp_pc + inst_quality +
                     lulc_forest + lulc_grassland + lulc_shrubland + lulc_riparian + lulc_sparse + lulc_agriculture + lulc_developed + lulc_other +
                     region_nordovest + region_nordest + region_centro + region_sud + region_isole +
                     env + cf + lag,
@@ -317,7 +336,7 @@ imp <- rbind(
   varimp_windxg[[1]] %>%
     as.data.frame() %>%
     rownames_to_column() %>%
-    mutate(model = "XGBoost",
+    mutate(model = "GBM",
            tech = "Wind"),
   varimp_windlasso[[1]] %>%
     as.data.frame() %>%
@@ -340,7 +359,7 @@ imp <- rbind(
   varimp_solarxg[[1]] %>%
     as.data.frame() %>%
     rownames_to_column() %>%
-    mutate(model = "XGBoost",
+    mutate(model = "GBM",
            tech = "Solar"),
   varimp_solarlasso[[1]] %>%
     as.data.frame() %>%
@@ -364,6 +383,8 @@ imp <- rbind(
     "unemploy"       = "Unemployment",
     "foreignborn"    = "Foreign born",
     "poverty"        = "Poverty",
+    "gdp_pc"         = "GDP per capita",
+    "inst_quality"   = "Institutional quality",
     "lulc_forest"       = "Forest",
     "lulc_grassland"    = "Grassland",
     "lulc_shrubland"    = "Shrubland",

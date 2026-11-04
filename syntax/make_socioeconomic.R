@@ -8,9 +8,25 @@ snap <- function(r, method = "bilinear") {
   r |> project(base_ras) |> resample(base_ras, method = method) |> mask(base_ras)
 }
 
+# ── Shared: Italian communes with ISTAT codes ─────────────────────────────────
 comuni <- giscoR::gisco_get_communes(country = "IT", year = "2016") %>%
   st_transform(italy_crs) %>%
   mutate(istat_code = str_sub(COMM_ID, -6))  # last 6 chars = ISTAT code
+
+# Assign NUTS-3 province to each municipality (centroid-based to avoid boundary issues)
+nuts3_16 <- giscoR::gisco_get_nuts(country = "IT", nuts_level = "3",
+                                    year = "2016", resolution = "03") %>%
+  st_transform(italy_crs) %>%
+  select(NUTS_ID)
+
+comuni_prov_ids <- comuni %>%
+  st_centroid() %>%
+  st_join(nuts3_16, join = st_within) %>%
+  st_drop_geometry() %>%
+  select(istat_code, NUTS_ID)
+
+# Augment comuni with province IDs for gap-filling below
+comuni <- comuni %>% left_join(comuni_prov_ids, by = "istat_code")
 
 
 # ── 1. Poverty proxy — MEF IRPEF municipal mean taxable income ────────────────
@@ -33,6 +49,12 @@ mef <- read_delim(
 
 comuni %>%
   left_join(mef %>% select(istat_code, mean_income), by = "istat_code") %>%
+  # Gap-fill: municipalities without tax data get their province median income
+  group_by(NUTS_ID) %>%
+  mutate(mean_income = coalesce(mean_income, median(mean_income, na.rm = TRUE))) %>%
+  ungroup() %>%
+  # Final fallback: national median for provinces with no data at all
+  mutate(mean_income = coalesce(mean_income, median(mean_income, na.rm = TRUE))) %>%
   vect() %>%
   rasterize(base_ras, field = "mean_income") %>%
   snap() %>%
@@ -43,7 +65,10 @@ message("saved: svi_pov.tif")
 
 # ── 2. Unemployment — ISTAT LFS provincial (NUTS-3) ──────────────────────────
 # Source: Dati provinciali (IT1,151_914_DF_DCCV_TAXDISOCCU1_8,1.0).csv
-# REF_AREA = 5-char NUTS-3 codes (e.g. "ITC11"). SEX = 9 (total).
+# REF_AREA = 5-char NUTS-3 codes. ISTAT uses a mix of NUTS 2016 (ITD*, ITE*)
+# and pre-2010 codes (IT1XX). Fix: join to NUTS 2016 geometry; use NUTS 2006
+# as a fallback for the ~3 legacy IT1XX codes; fill any remaining gaps with
+# national average.
 
 unemp <- read_csv(
   "./data/raw_downloads/Dati provinciali (IT1,151_914_DF_DCCV_TAXDISOCCU1_8,1.0).csv",
@@ -55,24 +80,41 @@ unemp <- read_csv(
   ungroup() %>%
   select(REF_AREA, Osservazione)
 
-giscoR::gisco_get_nuts(country = "IT", nuts_level = "3",
-                       year = "2021", resolution = "03") %>%
+# Primary join: NUTS 2016 geometry (covers ITD*, ITE*, ITF*, ITG*, ITC* codes)
+unemp_rast_2016 <- giscoR::gisco_get_nuts(country = "IT", nuts_level = "3",
+                                           year = "2016", resolution = "03") %>%
   st_transform(italy_crs) %>%
   left_join(unemp, by = c("NUTS_ID" = "REF_AREA")) %>%
   vect() %>%
   rasterize(base_ras, field = "Osservazione") %>%
-  snap() %>%
-  writeRaster(file.path(var_path, "svi_unemp.tif"), overwrite = TRUE)
+  snap()
 
+# Fallback join: NUTS 2006 geometry (covers legacy IT1XX codes)
+unemp_rast_2006 <- giscoR::gisco_get_nuts(country = "IT", nuts_level = "3",
+                                           year = "2006", resolution = "03") %>%
+  st_transform(italy_crs) %>%
+  left_join(unemp, by = c("NUTS_ID" = "REF_AREA")) %>%
+  vect() %>%
+  rasterize(base_ras, field = "Osservazione") %>%
+  snap()
+
+# Merge: prefer 2016 values; fill gaps with 2006; remaining gaps → national mean
+unemp_merged <- terra::merge(unemp_rast_2016, unemp_rast_2006)
+
+nat_mean_unemp <- global(unemp_merged, "mean", na.rm = TRUE)[[1]]
+unemp_final <- ifel(is.na(unemp_merged), nat_mean_unemp, unemp_merged) %>%
+  mask(base_ras)
+
+writeRaster(unemp_final, file.path(var_path, "svi_unemp.tif"), overwrite = TRUE)
 message("saved: svi_unemp.tif")
 
 
 # ── 3. Foreign-born % — ISTAT census, municipal level ────────────────────────
 # Source: Popolazione per paese di nascita - comuni (IT1,DF_DCSS_HCUE_COM_3_COM,1.0).csv
-# GENDER is parsed as logical ("T" → TRUE). REF_AREA = 6-digit ISTAT code for communes.
-# COUNTRY_BIRTH: "WORLD" = total, "WRL_X_ITA" = born abroad.
+# GENDER is parsed as logical ("T" → TRUE). REF_AREA = 6-digit ISTAT code.
+# COUNTRY_BIRTH: "WORLD" = total population, "WRL_X_ITA" = born abroad.
 
-read_csv(
+foreignborn_vals <- read_csv(
   "./data/raw_downloads/Popolazione per paese di nascita - comuni (IT1,DF_DCSS_HCUE_COM_3_COM,1.0).csv",
   show_col_types = FALSE
 ) %>%
@@ -84,9 +126,20 @@ read_csv(
   pivot_wider(id_cols = REF_AREA, names_from = COUNTRY_BIRTH,
               values_from = Osservazione) %>%
   rename(total = WORLD, foreign = WRL_X_ITA) %>%
-  mutate(istat_code = REF_AREA, foreignborn_pct = foreign / total) %>%
-  filter(!is.na(foreignborn_pct)) %>%
-  { left_join(comuni, select(., istat_code, foreignborn_pct), by = "istat_code") } %>%
+  mutate(istat_code = REF_AREA,
+         foreignborn_pct = if_else(total > 0, foreign / total, NA_real_)) %>%
+  select(istat_code, foreignborn_pct)
+
+comuni %>%
+  left_join(foreignborn_vals, by = "istat_code") %>%
+  # Gap-fill: municipalities without census data get their province median
+  group_by(NUTS_ID) %>%
+  mutate(foreignborn_pct = coalesce(foreignborn_pct,
+                                    median(foreignborn_pct, na.rm = TRUE))) %>%
+  ungroup() %>%
+  # Final fallback: national median
+  mutate(foreignborn_pct = coalesce(foreignborn_pct,
+                                    median(foreignborn_pct, na.rm = TRUE))) %>%
   vect() %>%
   rasterize(base_ras, field = "foreignborn_pct") %>%
   snap() %>%

@@ -5,7 +5,28 @@
 derived/
 archive/
 preprocessing/
+fig/
 
-# Downloaded and processed raster data — too large for git
-data/raw_downloads/
+# Processed raster data — too large for git, rebuilt by run_all.R
 data/processed_data/
+
+# Large geographic raw downloads — downloaded automatically by make_variables_italy.R
+# and make_natura2000.R; too large for GitHub (OSM PBF ~1.5 GB, WorldClim/DEM tiles
+# hundreds of MB). Small manually-downloaded CSVs below are tracked.
+data/raw_downloads/*.tif
+data/raw_downloads/*.vrt
+data/raw_downloads/*.gpkg
+data/raw_downloads/*.pbf
+data/raw_downloads/*.osm
+data/raw_downloads/*.zip
+data/raw_downloads/*.7z
+data/raw_downloads/*.nc
+data/raw_downloads/*.shp
+data/raw_downloads/*.shx
+data/raw_downloads/*.dbf
+data/raw_downloads/*.prj
+data/raw_downloads/*.cpg
+data/raw_downloads/*.qmd
+data/raw_downloads/eea_v_3035*/
+data/raw_downloads/wc2*/
+data/raw_downloads/srtm*/

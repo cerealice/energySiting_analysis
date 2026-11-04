@@ -3,6 +3,10 @@ source("./syntax/function.R")
 load("./derived/total.RData")
 results_masked <- rast("./derived/results_masked.tif")
 
+# Original figures are saved to fig/original/ so they are never overwritten
+# by new experimental versions in fig/new/
+dir.create("./fig/original", showWarnings = FALSE, recursive = TRUE)
+
 # plot(dac_masked)
 # plot(results_masked)
 
@@ -50,7 +54,7 @@ f1d <- w_ab_sf %>%
   theme(legend.position = "right")
 
 
-ggsave("./fig/f1.png", 
+ggsave("./fig/original/f1.png",
        ggarrange(f1a,f1b,f1c,f1d, nrow=2, ncol = 2), width = 14, height = 10, dpi = 300)
 
 
@@ -228,11 +232,11 @@ f2 <- ggarrange(ggarrange(ggarrange(s_reg1, s_reg2, ncol = 2),
                              heights = c(1.5, 1),
                              nrow = 2), 
                    nrow = 2, heights = c(1,1))
-ggsave("./fig/f2.png", f2, width = 12, height = 14, dpi = 300)
+ggsave("./fig/original/f2.png", f2, width = 12, height = 14, dpi = 300)
 
 ### f3 
-model_name <- c("GLM Solar","Lasso Solar","RF Solar","XGBoost Solar",
-            "GLM Wind","Lasso Wind","RF Wind","XGBoost Wind")
+model_name <- c("GLM Solar","Lasso Solar","RF Solar","GBM Solar",
+            "GLM Wind","Lasso Wind","RF Wind","GBM Wind")
 
 
 temp_file <- tempfile(fileext = ".png")
@@ -240,12 +244,19 @@ png(temp_file, width = 8, height = 12, units = "in", res = 300)
 
 par(mfrow = c(4, 2), bty = 'n')
 
+# Use the raster extent (stable across terra versions) and a shared viridis
+# colour ramp fixed at 0–1 so all 8 maps are directly comparable
+map_ext  <- ext(results_masked[[1]])
+map_cols <- viridis(100)
+
 for(i in 1:8){
-  plot(ext(rgn), main = model_name[[i]], cex.main=2, col = "white", border = NA, axes = FALSE)
-  plot(rgn, col = "gray70", border = NA, add = TRUE)
-  plot(results_masked[[i]], 
-       axes=F,useRaster=F, legend = F, add = T)
-  plot(rgn, border = "white", col = NA, add = T, lwd = 1.5)
+  plot(map_ext, main = model_name[[i]], cex.main = 2,
+       col = "white", border = NA, axes = FALSE)
+  plot(terra::vect(rgn), col = "gray70", border = NA, add = TRUE)
+  plot(results_masked[[i]],
+       col = map_cols, range = c(0, 1),
+       axes = FALSE, legend = FALSE, add = TRUE)
+  plot(terra::vect(rgn), border = "white", col = NA, add = TRUE, lwd = 1.5)
 }
 
 dev.off()
@@ -344,7 +355,7 @@ layout_matrix <- rbind(
 )
 
 # Save to PNG
-png(filename = "./fig/f3.png", width = 10, height = 10, units = "in", res = 300)
+png(filename = "./fig/original/f3.png", width = 10, height = 10, units = "in", res = 300)
 
 grid.newpage()
 grid.arrange(grobs = list(raster_grobs_labeled, barplot_grob, legend_grob), layout_matrix = layout_matrix)
@@ -449,7 +460,7 @@ w_f41 <- plot_grid(plotlist = maps, labels = "B", label_size = 14, label_fontfac
 
 
 f4 <- ggarrange(s_f41, s_f4, w_f41, w_f4, heights = c(1,1,1,1), nrow = 4)
-ggsave("./fig/f4.png", f4, width = 12, height = 12)
+ggsave("./fig/original/f4.png", f4, width = 12, height = 12)
 
 
 
@@ -501,7 +512,7 @@ ggsave("./fig/f4.png", f4, width = 12, height = 12)
 #     "GLM"      = "#1b9e77",
 #     "Lasso"    = "#d95f02",
 #     "RF"       = "#7570b3",
-#     "XGBoost"  = "#e7298a"
+#     "GBM"      = "#e7298a"
 #   )) +
 #   
 #   labs(

@@ -1,0 +1,381 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Italy RE Siting Analysis — Pipeline Summary</title>
+  <style>
+    body { font-family: 'Segoe UI', Arial, sans-serif; max-width: 960px; margin: 40px auto; padding: 0 24px; color: #222; line-height: 1.65; }
+    h1 { font-size: 1.7em; border-bottom: 3px solid #2c6e49; padding-bottom: 10px; color: #1a1a2e; }
+    h2 { font-size: 1.2em; margin-top: 2em; color: #2c6e49; border-left: 4px solid #2c6e49; padding-left: 10px; }
+    h3 { font-size: 1em; margin-top: 1.4em; color: #444; }
+    p, li { font-size: 0.95em; }
+    code { background: #f0f4f0; padding: 2px 6px; border-radius: 3px; font-family: 'Consolas', monospace; font-size: 0.88em; color: #2c6e49; }
+    pre { background: #f0f4f0; padding: 14px 18px; border-radius: 6px; overflow-x: auto; font-size: 0.85em; border-left: 4px solid #2c6e49; }
+    table { border-collapse: collapse; width: 100%; font-size: 0.88em; margin: 1em 0; }
+    th { background: #2c6e49; color: white; padding: 8px 12px; text-align: left; }
+    td { border: 1px solid #d4e8d4; padding: 7px 12px; }
+    tr:nth-child(even) td { background: #f5faf5; }
+    .tag { display: inline-block; font-size: 0.78em; padding: 2px 8px; border-radius: 10px; font-weight: 600; }
+    .done   { background: #d4edda; color: #155724; }
+    .note   { background: #fff3cd; color: #856404; }
+    .open   { background: #f8d7da; color: #721c24; }
+    .badge  { display: inline-block; background: #2c6e49; color: white; border-radius: 3px; font-size: 0.78em; padding: 1px 6px; font-family: monospace; }
+    .section-box { border: 1px solid #c8e6c9; border-radius: 6px; padding: 14px 18px; margin: 1em 0; background: #f9fdf9; }
+    .warn-box { border: 1px solid #ffe082; border-radius: 6px; padding: 12px 16px; margin: 1em 0; background: #fffde7; }
+    ul li { margin-bottom: 4px; }
+    .subtitle { color: #666; font-size: 0.95em; margin-top: -10px; margin-bottom: 24px; }
+    .toc a { color: #2c6e49; text-decoration: none; }
+    .toc a:hover { text-decoration: underline; }
+    .toc { background: #f0f4f0; border-radius: 6px; padding: 16px 20px; margin-bottom: 2em; font-size: 0.9em; }
+    .toc ul { margin: 6px 0; }
+    .toc li { margin: 3px 0; }
+  </style>
+</head>
+<body>
+
+<h1>Italy RE Siting Analysis — Pipeline Summary</h1>
+<p class="subtitle">Alice Di Bella · CMCC · Last updated: 26 October 2026</p>
+
+<nav class="toc">
+  <strong>Contents</strong>
+  <ul>
+    <li><a href="#overview">1. Overview</a></li>
+    <li><a href="#changes">2. Adaptations from US original</a></li>
+    <li><a href="#data">3. Data sources</a></li>
+    <li><a href="#pipeline">4. Pipeline scripts</a></li>
+    <li><a href="#variables">5. Predictor variables</a></li>
+    <li><a href="#model">6. Modelling decisions</a></li>
+    <li><a href="#rse">7. RSE Atlante enrichment</a></li>
+    <li><a href="#figures">8. Output figures (f1–f4)</a></li>
+    <li><a href="#status">9. Current status &amp; pending tasks</a></li>
+    <li><a href="#run">10. How to run</a></li>
+  </ul>
+</nav>
+
+<!-- ─────────────────────────────────────────────────────────── -->
+<h2 id="overview">1. Overview</h2>
+<p>
+  This project adapts a US-based utility-scale renewable energy siting analysis to Italy.
+  The modelling framework (pseudo-absence design, GLM + Lasso + Random Forest + GBM, random-effects slope analysis)
+  is identical to the original; changes concern input data sources, coordinate reference system,
+  administrative geography, and predictor variables.
+</p>
+<p>
+  The research question: <em>what spatial, socioeconomic, and policy factors drive the siting
+  of utility-scale solar and wind plants in Italy?</em>
+</p>
+
+<!-- ─────────────────────────────────────────────────────────── -->
+<h2 id="changes">2. Adaptations from US original</h2>
+
+<table>
+  <tr><th>Component</th><th>US original</th><th>Italy fork</th></tr>
+  <tr><td>Solar plant data</td><td>USGS US PV Database (GeoJSON, polygons)</td><td>Global Solar Power Tracker — GEM, Feb 2026 (Excel, points) + RSE Atlante Integrato (municipal)</td></tr>
+  <tr><td>Wind plant data</td><td>USGS US Wind Turbine Database (individual turbines)</td><td>Global Wind Power Tracker — GEM, Feb 2026 (Excel, project-level) + RSE Atlante Integrato (municipal)</td></tr>
+  <tr><td>Administrative units</td><td>US states (48 CONUS)</td><td>Italian NUTS-1 macro-regions (5): Nord-Ovest, Nord-Est, Centro, Sud, Isole</td></tr>
+  <tr><td>CRS</td><td>EPSG:5070 (NAD83 / Conus Albers)</td><td>EPSG:3035 (ETRS89 / LAEA Europe)</td></tr>
+  <tr><td>Plant area estimate</td><td>st_area() on polygon footprints</td><td>Capacity-based: 10,000 m²/MW solar · 300,000 m²/MW wind</td></tr>
+  <tr><td>Region variable</td><td>US Census divisions (6) as one-hot dummies</td><td>NUTS-1 macro-regions (5) as one-hot dummies</td></tr>
+  <tr><td>Socioeconomic vars</td><td>DAC index (US-specific)</td><td>Poverty (MEF IRPEF income), unemployment (ISTAT LFS NUTS-3), foreign-born % (ISTAT census)</td></tr>
+  <tr><td>Policy variable</td><td>RPS (Renewable Portfolio Standards)</td><td>FER incentive zone binary (national, until GSE zone data available)</td></tr>
+  <tr><td>ML method (4th model)</td><td>XGBoost (xgbTree via caret)</td><td>GBM (gbm via caret) — xgboost ≥ 2.0 incompatible with caret's xgbTree; label updated throughout modeling.R, data.R, plot.R</td></tr>
+  <tr><td>DAC analysis (f5)</td><td>DAC vs non-DAC t-test by model and region</td><td>Removed (US-specific); placeholder comment left in plot.R</td></tr>
+</table>
+
+<!-- ─────────────────────────────────────────────────────────── -->
+<h2 id="data">3. Data sources</h2>
+
+<h3>Presence data</h3>
+<table>
+  <tr><th>Source</th><th>Technology</th><th>Filter</th><th>File</th></tr>
+  <tr><td>Global Solar Power Tracker (GEM, Feb 2026)</td><td>Solar PV</td><td>Operating, ≥1 MW, commissioned ≥2017</td><td><code>data/Global-Solar-Power-Tracker-February-2026.xlsx</code></td></tr>
+  <tr><td>Global Wind Power Tracker (GEM, Feb 2026)</td><td>Wind</td><td>Onshore, operating, ≥10 MW, commissioned ≥2017</td><td><code>data/Global-Wind-Power-Tracker-February-2026.xlsx</code></td></tr>
+  <tr><td>RSE Atlante Integrato (fv_pot_comunale_2021)</td><td>Solar PV</td><td>Ground-mounted only, individual plant ≥100 kW (RSE source filter); municipal total ≥1 MW applied; used as additional presence points + mask enrichment</td><td><code>data/d__temp_fv_pot_comunale_2021/</code></td></tr>
+  <tr><td>RSE Atlante Integrato (eo_pot_comunale_2019)</td><td>Wind</td><td>Municipal total ≥1 MW; sources: GSE, The Wind Power, Sentinel-2 — utility-scale focused but no explicit per-turbine minimum stated; used as additional presence points + mask enrichment</td><td><code>data/d__temp_eo_pot_comunale_2019/</code></td></tr>
+</table>
+
+<div class="section-box">
+  <strong>RSE solar data scope (confirmed):</strong> The RSE description explicitly states the solar shapefile covers
+  <em>impianti fotovoltaici installati a terra</em> (ground-mounted PV only) with individual plant capacity
+  <em>&gt;100 kW</em>. Rooftop and small-scale systems are excluded at source by RSE before publication.
+  This makes the data appropriate for utility-scale siting analysis. Municipal threshold of ≥1 MW is applied
+  on top of this to match the GSPT per-plant minimum.
+</div>
+
+<h3>Predictor rasters</h3>
+<table>
+  <tr><th>Variable</th><th>File</th><th>Source</th><th>Notes</th></tr>
+  <tr><td>Transmission distance</td><td><code>transmission_110_qgis.tif</code></td><td>TERNA GIS</td><td>Manual download; ≥110 kV lines</td></tr>
+  <tr><td>Substation distance</td><td><code>substations_110_qgis.tif</code></td><td>TERNA GIS</td><td>Manual download; ≥110 kV substations</td></tr>
+  <tr><td>Road distance</td><td><code>roads_qgis.tif</code></td><td>OpenStreetMap via osmextract</td><td></td></tr>
+  <tr><td>Slope</td><td><code>slope.tif</code></td><td>SRTM via geodata</td><td></td></tr>
+  <tr><td>Population density</td><td><code>pop_density.tif</code></td><td>WorldPop 2020 via geodata</td><td></td></tr>
+  <tr><td>Solar capacity factor</td><td><code>solar_capacity.tif</code></td><td>WorldClim srad (proxy; replace with PVGIS)</td><td></td></tr>
+  <tr><td>Wind capacity factor</td><td><code>wind_capacity.tif</code></td><td>WorldClim wind (proxy; replace with ERA5/CDS)</td><td></td></tr>
+  <tr><td>Land cover (8 classes)</td><td><code>lulc_*.tif</code></td><td>ESA WorldCover 2021 via geodata</td><td>Forest, grassland, shrubland, riparian, sparse, agriculture, developed, other</td></tr>
+  <tr><td>NUTS-1 region dummies (5)</td><td><code>region_*.tif</code></td><td>Eurostat via giscoR</td><td>Nord-Ovest, Nord-Est, Centro, Sud, Isole</td></tr>
+  <tr><td>Spatial lag</td><td><code>solar_lag.tif / wind_lag.tif</code></td><td>Derived from GEM rasters</td><td></td></tr>
+  <tr><td>FER incentive zone</td><td><code>fer_incentive.tif</code></td><td>National binary (all Italy = 1)</td><td>Placeholder until GSE zone data available</td></tr>
+  <tr><td>Environmental impact score</td><td><code>env_impactScore_solar/wind.tif</code></td><td>EEA Natura 2000 end-2024 + slope</td><td>0.7 × Natura 2000 proximity + 0.3 × normalised slope</td></tr>
+  <tr><td>Poverty proxy</td><td><code>svi_pov.tif</code></td><td>MEF IRPEF 2024 (municipal mean taxable income)</td><td>Lower income → higher poverty</td></tr>
+  <tr><td>Unemployment</td><td><code>svi_unemp.tif</code></td><td>ISTAT LFS (NUTS-3 province level)</td><td>Most recent year, DATA_TYPE = UNEM_R</td></tr>
+  <tr><td>Foreign-born %</td><td><code>svi_foreignborn.tif</code></td><td>ISTAT census (municipal level)</td><td>WRL_X_ITA / WORLD, most recent year</td></tr>
+</table>
+
+<!-- ─────────────────────────────────────────────────────────── -->
+<h2 id="pipeline">4. Pipeline scripts</h2>
+
+<table>
+  <tr><th>Script</th><th>Purpose</th><th>Outputs</th><th>Run frequency</th></tr>
+  <tr><td><code>function.R</code></td><td>Package loading, CRS definition (<code>projection</code>), Italian NUTS-2 boundaries (<code>region_boundaries</code>)</td><td>—</td><td>sourced automatically</td></tr>
+  <tr><td><code>make_base_raster.R</code></td><td>1 km EPSG:3035 grid over Italy (Eurostat boundary)</td><td><code>Italy_base_raster.tif</code></td><td>Once</td></tr>
+  <tr><td><code>make_variables_italy.R</code></td><td>Downloads / processes all predictor rasters</td><td>All <code>variables/*.tif</code></td><td>Once (or when source data changes)</td></tr>
+  <tr><td><code>make_socioeconomic.R</code></td><td>Builds poverty, unemployment, foreign-born rasters from ISTAT/MEF CSVs</td><td><code>svi_pov.tif</code>, <code>svi_unemp.tif</code>, <code>svi_foreignborn.tif</code></td><td>Once</td></tr>
+  <tr><td><code>make_natura2000.R</code></td><td>Builds environmental impact score (Natura 2000 proximity + slope)</td><td><code>env_impactScore_solar/wind.tif</code></td><td>Once</td></tr>
+  <tr><td><code>stack.R</code></td><td>Combines all predictor rasters into covariate stacks (shared + technology-specific)</td><td><code>covStack.tif</code>, <code>solar/wind_covStack.tif</code>, <code>future.tif</code></td><td>When variables change</td></tr>
+  <tr><td><code>tech.R</code></td><td>Reads GEM trackers + RSE Atlante, assigns NUTS-2, rasterizes presence &amp; mask</td><td><code>solar/wind_hull_existing.tif</code>, <code>*_mask.tif</code>, <code>location.RData</code></td><td>Each run</td></tr>
+  <tr><td><code>absence.R</code></td><td>Pseudo-absence sampling stratified by NUTS-1 region</td><td><code>absence.RData</code>, <code>solar/wind_absence_roi.tif</code></td><td>Each run</td></tr>
+  <tr><td><code>zonal.R</code></td><td>Zonal statistics: extracts mean predictor values for each presence/absence zone</td><td><code>bg_cov_solar/wind.csv</code>, <code>existing_cov_solar/wind.csv</code></td><td>Each run</td></tr>
+  <tr><td><code>modeling.R</code></td><td>10-fold pseudo-absence subsampling; GLM, Lasso, RF, GBM; probability maps</td><td><code>pred_*.tif</code>, <code>solar/wind.csv</code>, <code>model_results.RData</code></td><td>Each run (~30–60 min)</td></tr>
+  <tr><td><code>data.R</code></td><td>Masks predictions to suitable ROI; mean probability by region; GLMM regional slopes</td><td><code>results_masked.tif</code>, <code>total.RData</code></td><td>Each run</td></tr>
+  <tr><td><code>plot.R</code></td><td>Generates figures f1–f4</td><td><code>fig/f1.png</code> … <code>fig/f4.png</code></td><td>Each run</td></tr>
+  <tr><td><code>run_all.R</code></td><td>Runs tech → plot in sequence with error reporting and timing</td><td>—</td><td>Entry point</td></tr>
+</table>
+
+<!-- ─────────────────────────────────────────────────────────── -->
+<h2 id="variables">5. Predictor variables in the model</h2>
+
+<div class="section-box">
+<pre>treat ~ tx + roads + sub + slope + pop + fer
+      + unemploy + foreignborn + poverty
+      + lulc_forest + lulc_grassland + lulc_shrubland + lulc_riparian
+      + lulc_sparse + lulc_agriculture + lulc_developed + lulc_other
+      + region_nordovest + region_nordest + region_centro + region_sud + region_isole
+      + env + cf + lag</pre>
+</div>
+
+<p>25 predictors total (26 terms including intercept). The <code>region_</code> dummies are one-hot encoded at the pixel level from NUTS-1 rasters.</p>
+
+<p>Random-effects GLMM (figure 4) uses varying slopes by NUTS-1 macro-region:</p>
+<ul>
+  <li><strong>Solar:</strong> <code>treat ~ [fixed effects] + (pop + tx + env | region)</code></li>
+  <li><strong>Wind:</strong> <code>treat ~ [fixed effects] + (cf + tx + lag | region)</code></li>
+</ul>
+
+<!-- ─────────────────────────────────────────────────────────── -->
+<h2 id="model">6. Modelling decisions</h2>
+
+<h3>Pseudo-absence design</h3>
+<p>
+  Background points are divided into 10 groups. The model is run once per group (group + presence),
+  and the group with median AIC is selected as the final dataset for ML training.
+  This reduces dependence on the specific pseudo-absence draw.
+</p>
+
+<h3>Machine learning</h3>
+<table>
+  <tr><th>Model</th><th>Implementation</th><th>Notes</th></tr>
+  <tr><td>GLM (logistic)</td><td><code>glm(..., family = binomial)</code></td><td>Baseline; 10-fold CV via caret</td></tr>
+  <tr><td>Lasso</td><td><code>caret / glmnet</code>, α = 1</td><td>λ grid: 10⁻³ – 10³ (100 values)</td></tr>
+  <tr><td>Random Forest</td><td><code>caret / rf</code></td><td>metric = ROC; variable importance retained</td></tr>
+  <tr><td>GBM</td><td><code>caret / gbm</code></td><td>Replaces XGBoost: xgboost ≥ 2.0 (v3.2.1.1) is incompatible with caret's xgbTree wrapper; GBM is equivalent in capability</td></tr>
+</table>
+
+<p>
+  <strong>treat encoding:</strong> the response is stored in <code>solar.csv</code> / <code>wind.csv</code> as
+  <code>"X0"</code> / <code>"X1"</code> (output of <code>make.names()</code> applied before caret training).
+  <code>data.R</code> converts back to integer 0/1 (<code>as.integer(treat == "X1")</code>) for the GLMM.
+</p>
+
+<h3>Key bugs fixed during Italy adaptation</h3>
+<ul>
+  <li><strong>giscoR year:</strong> <code>gisco_get_communes(year="2020")</code> invalid → changed to <code>"2016"</code> (most recent available)</li>
+  <li><strong>ISTAT code join:</strong> giscoR <code>COMM_ID</code> is "IT101004145" (not 6-digit) → use <code>str_sub(COMM_ID, -6)</code></li>
+  <li><strong>Foreign-born GENDER filter:</strong> column parsed as logical by <code>read_csv</code> → <code>filter(GENDER, ...)</code> not <code>filter(GENDER == "T", ...)</code></li>
+  <li><strong>pivot_wider missing column:</strong> <code>slice_max</code> must be grouped by both <code>REF_AREA</code> and <code>COUNTRY_BIRTH</code> to avoid dropping one birth-country category</li>
+  <li><strong>Group size mismatch:</strong> hardcoded <code>rep(10, 8)</code> from US dataset → <code>rep(10, nrow(s.bg) %% 10)</code></li>
+  <li><strong>Variable label mismatch:</strong> GLM drops collinear terms → positional <code>v_name</code> vector misaligned; replaced with named <code>var_labels</code> + <code>rownames_to_column()</code> + <code>recode(var, !!!var_labels)</code></li>
+  <li><strong>XGBoost ROC all NA:</strong> xgboost 3.2.1.1 incompatible with caret xgbTree → replaced with GBM</li>
+  <li><strong>GLMM response type:</strong> <code>treat</code> read back from CSV as character "X0"/"X1" → <code>glmer</code> rejected; fixed with <code>as.integer(treat == "X1")</code> at read time in data.R</li>
+  <li><strong>projection@projargs fragile:</strong> newer PROJ expands <code>+init=epsg:3035</code> → regex no longer extracts the EPSG code; replaced with hardcoded <code>st_transform(crs = 3035)</code></li>
+</ul>
+
+<!-- ─────────────────────────────────────────────────────────── -->
+<h2 id="rse">7. RSE Atlante Integrato enrichment</h2>
+
+<p>
+  The <a href="https://atlanteintegrato.rse-web.it/">RSE Atlante Integrato</a> (Ricerca sul Sistema Energetico)
+  provides municipal-level installed renewable energy capacity for Italy, beyond what the GEM trackers cover.
+</p>
+
+<table>
+  <tr><th>File</th><th>Technology</th><th>Year</th><th>Comuni with data</th><th>Threshold applied</th></tr>
+  <tr><td><code>fv_pot_comunale_2021.shp</code></td><td>Solar PV</td><td>2021</td><td>3,641 / 7,903 (≥0.001 MW)</td><td>≥1 MW per comune (RSE already filters to ground-mounted, individual plant ≥100 kW)</td></tr>
+  <tr><td><code>eo_pot_comunale_2019.shp</code></td><td>Wind</td><td>2019</td><td>362 / 7,926 (≥0.01 MW)</td><td>≥1 MW per comune. Sources: GSE register, The Wind Power DB, Sentinel-2, ISTAT. No explicit minimum turbine size stated, but all source databases are utility-scale; micro-wind is negligible in Italy.</td></tr>
+</table>
+
+<p>
+  Join key: <code>PRO_COM</code> (ISTAT numeric province-municipality code, e.g. 71006).
+  Municipality centroids are used as proxy point locations.
+  Duplicates vs. the GEM mask are removed (<code>st_is_within_distance(..., dist = 500)</code>).
+</p>
+
+<div class="section-box">
+  <strong>Rooftop contamination resolved:</strong> RSE explicitly excludes rooftop and small-scale systems
+  (source filter: ground-mounted only, individual plant ≥100 kW). RSE presence points are therefore
+  appropriate for the utility-scale siting research question and are included in both
+  <code>solar_locations</code> and the pseudo-absence mask.
+</div>
+
+<!-- ─────────────────────────────────────────────────────────── -->
+<h2 id="figures">8. Output figures</h2>
+
+<p>All figures are saved at 300 dpi in <code>fig/</code>. The four figures progress logically from data description → model diagnostics → predictions → regional heterogeneity.</p>
+
+<!-- ── f1 ── -->
+<h3>Figure 1 — <code>fig/f1.png</code> &nbsp;·&nbsp; Data overview (2 × 2 map panel)</h3>
+<div class="section-box">
+<table>
+  <tr><th>Panel</th><th>Content</th><th>Colour scale</th></tr>
+  <tr><td><strong>Top-left (A)</strong> — Existing solar</td><td>Point locations of all solar presence sites (GSPT utility-scale ≥1 MW commissioned ≥2017 + RSE ground-mounted ≥1 MW), overlaid on Italian NUTS-2 boundaries</td><td>Yellow → red gradient by capacity (MW)</td></tr>
+  <tr><td><strong>Top-right (B)</strong> — Existing wind</td><td>Point locations of all wind presence sites (GWPT onshore ≥10 MW commissioned ≥2017 + RSE municipal ≥1 MW), overlaid on NUTS-2 boundaries</td><td>Yellow → red gradient by capacity (GW)</td></tr>
+  <tr><td><strong>Bottom-left (C)</strong> — Solar pseudo-absences</td><td>Background points sampled for solar, shown as 5 km buffers coloured by the iteration (1–10) they belong to. Absences are excluded from existing plant masks and unsuitable areas</td><td>10-colour Paired palette by iteration</td></tr>
+  <tr><td><strong>Bottom-right (D)</strong> — Wind pseudo-absences</td><td>Background points sampled for wind, coloured by iteration</td><td>10-colour Paired palette by iteration</td></tr>
+</table>
+<p><em>Purpose:</em> shows the spatial distribution and coverage of the training data. Heterogeneous pseudo-absence iteration colours confirm that background points span the full territory rather than clustering in one area.</p>
+</div>
+
+<!-- ── f2 ── -->
+<h3>Figure 2 — <code>fig/f2.png</code> &nbsp;·&nbsp; GLM coefficients + variable importance</h3>
+<div class="section-box">
+<p>Two identical row blocks — top block for <strong>Solar</strong>, bottom for <strong>Wind</strong>. Each block has three sub-panels:</p>
+<table>
+  <tr><th>Sub-panel</th><th>Content</th><th>Reading guide</th></tr>
+  <tr>
+    <td><strong>Left — all-groups coefficient plot (A / B)</strong></td>
+    <td>GLM log-odds coefficients for each of the 25 predictors, plotted for all 10 pseudo-absence groups simultaneously (no error bars). Red dot = significant (p &lt; 0.05); grey = not significant.</td>
+    <td>Variables whose dots cluster tightly around a non-zero value are consistently important across pseudo-absence draws, indicating robustness to the background sampling</td>
+  </tr>
+  <tr>
+    <td><strong>Right — selected-group coefficient plot with 95% CI</strong></td>
+    <td>Same GLM coefficients but only for the group with median AIC (group 5), now shown with ±1.96 SE error bars.</td>
+    <td>This is the "primary" GLM result; error bars crossing zero indicate non-significant effects at α = 0.05</td>
+  </tr>
+  <tr>
+    <td><strong>Bottom — variable importance bar chart</strong></td>
+    <td>Permutation-based importance (%) from all four ML models (GLM, Lasso, RF, GBM), grouped by predictor and ordered by importance descending.</td>
+    <td>Variables important across multiple models are the most reliable drivers; disagreement between models highlights uncertainty</td>
+  </tr>
+</table>
+</div>
+
+<!-- ── f3 ── -->
+<h3>Figure 3 — <code>fig/f3.png</code> &nbsp;·&nbsp; Prediction probability surfaces + regional summary</h3>
+<div class="section-box">
+<p>Composite figure with three components arranged in a 12-row × 3-column grid:</p>
+<table>
+  <tr><th>Component</th><th>Position</th><th>Content</th></tr>
+  <tr>
+    <td><strong>A — Probability maps (8 panels)</strong></td>
+    <td>Left two-thirds, rows 1–11</td>
+    <td>4 × 2 grid of raster maps (4 models × 2 technologies), each showing the predicted siting probability (0–1) across the Italian territory, masked to the suitable-area ROI. Layout: GLM Solar | GLM Wind / Lasso Solar | Lasso Wind / RF Solar | RF Wind / GBM Solar | GBM Wind. Background is grey (unsuitable or outside Italy).</td>
+  </tr>
+  <tr>
+    <td><strong>B — Regional bar chart</strong></td>
+    <td>Right third, full height</td>
+    <td>Horizontal grouped bar chart showing mean predicted probability per NUTS-1 macro-region (Nord-Ovest, Nord-Est, Centro, Sud, Isole), faceted by technology (Solar / Wind). Four bars per region = four models. Scale capped at 40%.</td>
+  </tr>
+  <tr>
+    <td><strong>Colour legend</strong></td>
+    <td>Bottom-left, row 12</td>
+    <td>Viridis colour ramp (0 → 1 probability) shared by all 8 maps.</td>
+  </tr>
+</table>
+<p><em>Purpose:</em> answers "where does each model predict high siting probability, and how much do regions differ?" High agreement across models in the same areas provides confidence in the spatial pattern.</p>
+</div>
+
+<!-- ── f4 ── -->
+<h3>Figure 4 — <code>fig/f4.png</code> &nbsp;·&nbsp; Regional heterogeneity (GLMM random slopes)</h3>
+<div class="section-box">
+<p>Four-row figure from the random-effects GLMM (fitted in <code>data.R</code> via <code>lme4::glmer</code>). The GLMM allows the slope of selected key predictors to vary by NUTS-1 macro-region, capturing how the importance of each driver differs across Italy.</p>
+<table>
+  <tr><th>Row</th><th>Content</th><th>Variables shown</th></tr>
+  <tr>
+    <td><strong>A — Solar maps (row 1)</strong></td>
+    <td>Three choropleth maps of Italy at NUTS-1 level, each filled by the region's random slope (deviation from the national average) for one solar driver. Diverging colour scale: orange = negative deviation, blue = positive deviation, white = national average.</td>
+    <td>Population density · Transmission distance · Environmental score</td>
+  </tr>
+  <tr>
+    <td><strong>Solar dot-plot (row 2)</strong></td>
+    <td>Horizontal point-range chart with ±1.96 posterior SD intervals, one point per NUTS-1 region per variable, faceted by variable. x-axis is log-odds scale; vertical dashed line at 0 = national average.</td>
+    <td>Same three solar variables</td>
+  </tr>
+  <tr>
+    <td><strong>B — Wind maps (row 3)</strong></td>
+    <td>Same choropleth format for three wind drivers.</td>
+    <td>Capacity factor · Spatial lag · Transmission distance</td>
+  </tr>
+  <tr>
+    <td><strong>Wind dot-plot (row 4)</strong></td>
+    <td>Same point-range format for wind.</td>
+    <td>Same three wind variables</td>
+  </tr>
+</table>
+<p><em>Purpose:</em> answers "does the same factor matter equally across all Italian regions?" A region whose interval does not cross zero has a statistically distinguishable effect for that variable. For example, transmission distance may be a much stronger positive predictor in the South (where grid infrastructure is less dense) than in the North.</p>
+<p><em>Variable selection rationale:</em> solar uses population density (proximity to demand), transmission distance (grid access), and environmental score (Natura 2000 constraint). Wind uses capacity factor (wind resource quality), spatial lag (clustering of existing wind), and transmission distance.</p>
+</div>
+
+<!-- ─────────────────────────────────────────────────────────── -->
+<h2 id="status">9. Current status &amp; pending tasks</h2>
+
+<table>
+  <tr><th>Task</th><th>Status</th><th>Notes</th></tr>
+  <tr><td>All predictor rasters built and validated</td><td><span class="tag done">Done</span></td><td>30 rasters in <code>variables/</code></td></tr>
+  <tr><td>make_socioeconomic.R — real ISTAT/MEF data</td><td><span class="tag done">Done</span></td><td>svi_pov, svi_unemp, svi_foreignborn</td></tr>
+  <tr><td>make_natura2000.R — Natura 2000 + slope composite score</td><td><span class="tag done">Done</span></td><td>0.7 × proximity + 0.3 × slope</td></tr>
+  <tr><td>modeling.R — full pipeline run with GBM (8 prediction surfaces)</td><td><span class="tag done">Done</span></td><td>pred_logReg, pred_lasso, pred_randomForest, pred_xg × solar/wind</td></tr>
+  <tr><td>tech.R — RSE Atlante Integrato presence enrichment</td><td><span class="tag done">Done</span></td><td>Solar ≥1 MW ground-mounted (≥100 kW/plant); wind ≥1 MW from GSE+TWP+Sentinel-2</td></tr>
+  <tr><td>RSE solar scope confirmed: ground-mounted, ≥100 kW/plant</td><td><span class="tag done">Done</span></td><td>Rooftop excluded at source — appropriate for utility-scale analysis</td></tr>
+  <tr><td>RSE wind scope confirmed: GSE + The Wind Power + Sentinel-2</td><td><span class="tag done">Done</span></td><td>No explicit per-turbine minimum, but sources are utility-scale focused</td></tr>
+  <tr><td>Decision: RSE as presence (not mask-only)</td><td><span class="tag done">Done</span></td><td>Resolved: RSE data quality warrants use as presence points</td></tr>
+  <tr><td>run_all.R — pipeline runner with per-script error reporting</td><td><span class="tag done">Done</span></td><td>Warnings muffled per script; errors report name + traceback; timing per step</td></tr>
+  <tr><td>data.R — fix treat encoding ("X0"/"X1" → 0/1 for GLMM)</td><td><span class="tag done">Done</span></td><td><code>as.integer(treat == "X1")</code> at read_csv time</td></tr>
+  <tr><td>data.R — fix CRS extraction (projection@projargs fragile)</td><td><span class="tag done">Done</span></td><td>Hardcoded <code>st_transform(crs = 3035)</code></td></tr>
+  <tr><td>"XGBoost" → "GBM" label in modeling.R, data.R, plot.R</td><td><span class="tag done">Done</span></td><td>All occurrences updated including imp data frame and model_name vector</td></tr>
+  <tr><td>pipeline_summary.html — project documentation</td><td><span class="tag done">Done</span></td><td>This file</td></tr>
+  <tr><td>Full re-run with RSE-enriched presence data</td><td><span class="tag open">Pending</span></td><td>Run <code>source("run_all.R")</code> — tech.R → plot.R</td></tr>
+  <tr><td>Replace WorldClim solar CF proxy with PVGIS</td><td><span class="tag open">Pending</span></td><td>Requires PVGIS API or manual download; re-run make_variables_italy.R + stack.R</td></tr>
+  <tr><td>Replace WorldClim wind CF proxy with ERA5 / Copernicus CDS</td><td><span class="tag open">Pending</span></td><td>Requires CDS account and download</td></tr>
+  <tr><td>Replace FER binary with real GSE incentive zone polygons</td><td><span class="tag open">Pending</span></td><td>GSE publishes eligible zone maps; would make fer a spatially varying predictor</td></tr>
+  <tr><td>plot.R — generate f1–f4 (after full re-run)</td><td><span class="tag open">Pending</span></td><td>Blocked on full pipeline re-run</td></tr>
+</table>
+
+<!-- ─────────────────────────────────────────────────────────── -->
+<h2 id="run">10. How to run</h2>
+
+<p>Open <code>energySiting.Rproj</code> in RStudio first (sets working directory to project root).</p>
+
+<h3>Main analysis pipeline (run after any code or data change)</h3>
+<pre>source("run_all.R")</pre>
+
+<p>This runs: <code>tech.R → absence.R → zonal.R → modeling.R → data.R → plot.R</code></p>
+<p>If a script fails, the runner prints <code>!! ERROR in &lt;script.R&gt; !!</code> with the message and traceback.</p>
+
+<h3>One-time data preparation (run when source data changes)</h3>
+<pre># Call explicitly — not run by default in run_all.R
+run_setup()   # make_base_raster + make_variables_italy + make_socioeconomic + make_natura2000 + stack</pre>
+
+<h3>Selective re-run</h3>
+<pre>source("syntax/make_natura2000.R")   # rebuild env impact score
+source("syntax/stack.R")              # rebuild predictor stack
+source("run_all.R")                   # re-run full analysis</pre>
+
+<hr style="margin-top: 3em; border-color: #c8e6c9;">
+<p style="color: #888; font-size: 0.82em;">
+  Generated October 2026 · CMCC Foundation – Euro-Mediterranean Centre on Climate Change ·
+  Analysis adapted from original US siting study · CRS: EPSG:3035
+</p>
+
+</body>
+</html>

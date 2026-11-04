@@ -2,38 +2,82 @@ source("./syntax/function.R")
 
 processed_layer_path <- "./data/processed_data/variables"
 
-# ── Shared predictor layers ───────────────────────────────────────────────────
-# Italian equivalents of the US predictor rasters. All files must be placed in
-# data/processed_data/variables/ aligned to Italy_base_raster.tif (EPSG:3035,
-# 1 km resolution) before running this script.
-#
+# ── Release any open file handles to the output files ────────────────────────
+# On Windows, SpatRaster / RasterStack objects keep an exclusive handle on
+# their backing .tif.  Scan the global environment and drop anything that
+# points at our output paths before we try to write to them.
+.out <- normalizePath(
+  c("./derived/covStack.tif", "./derived/solar_covStack.tif",
+    "./derived/wind_covStack.tif", "./derived/future.tif"),
+  mustWork = FALSE
+)
+for (.nm in ls(envir = .GlobalEnv)) {
+  .obj <- get(.nm, envir = .GlobalEnv)
+  if (inherits(.obj, c("SpatRaster", "RasterStack", "RasterBrick", "RasterLayer"))) {
+    .src <- tryCatch(
+      normalizePath(terra::sources(terra::rast(.obj)), mustWork = FALSE),
+      error = function(e) character(0)
+    )
+    if (any(.src %in% .out)) {
+      rm(list = .nm, envir = .GlobalEnv)
+      message("Released handle: ", .nm)
+    }
+  }
+}
+rm(.nm, .obj, .src, .out)
+gc()
+
+# ── Helper: z-score scale a SpatRaster layer ─────────────────────────────────
+terra_scale <- function(r) {
+  m <- terra::global(r, "mean", na.rm = TRUE)[[1]]
+  s <- terra::global(r, "sd",   na.rm = TRUE)[[1]]
+  (r - m) / s
+}
+
+# ── Helper: load layers, scale the continuous ones, stack and write ───────────
+# scale_up_to: layers 1..scale_up_to are z-scored; the rest are left as-is
+build_stack <- function(paths, layer_names, scale_up_to, out_path) {
+  layers <- vector("list", length(paths))
+  for (i in seq_along(paths)) {
+    r <- terra::rast(paths[[i]])
+    names(r) <- layer_names[[i]]
+    layers[[i]] <- if (i <= scale_up_to) terra_scale(r) else r
+  }
+  stk <- terra::rast(layers)
+  terra::writeRaster(stk, out_path, overwrite = TRUE)
+  message("Saved: ", out_path)
+  invisible(stk)
+}
+
+# ── Shared predictor stack ────────────────────────────────────────────────────
 # Sources:
-#   Infrastructure  → TERNA (transmission, substations)
-#                     OpenStreetMap (roads)
+#   Infrastructure  → TERNA (transmission, substations), OSM (roads)
 #   Biophysical     → EU-DEM / SRTM (slope)
 #   Demographics    → ISTAT / GHSL (population density)
 #   Socioeconomic   → ISTAT census (unemployment, poverty, foreign-born %)
-#   Land use        → Copernicus CORINE Land Cover
-#   Policy          → GSE / MASE (FER incentive eligibility by region)
-#   Regions         → Italian NUTS-1 macro-regions (5 units):
-#                       Nord-Ovest, Nord-Est, Centro, Sud, Isole
+#   Land use        → Copernicus CORINE Land Cover (binary)
+#   Policy          → GSE / MASE (FER incentive eligibility, binary)
+#   Regions         → Italian NUTS-1 macro-regions (binary)
 
-cov.filePaths <- c(
+cov_paths <- c(
   # Infrastructure
-  file.path(processed_layer_path, "transmission_110_qgis.tif"),   # dist. to 110+ kV lines (TERNA)
-  file.path(processed_layer_path, "roads_qgis.tif"),              # dist. to roads (OSM)
-  file.path(processed_layer_path, "substations_110_qgis.tif"),    # dist. to substations (TERNA)
+  file.path(processed_layer_path, "transmission_110_qgis.tif"),
+  file.path(processed_layer_path, "roads_qgis.tif"),
+  file.path(processed_layer_path, "substations_110_qgis.tif"),
   # Biophysical
-  file.path(processed_layer_path, "slope.tif"),                   # terrain slope (EU-DEM)
+  file.path(processed_layer_path, "slope.tif"),
   # Demographics
-  file.path(processed_layer_path, "pop_density.tif"),             # population density (ISTAT/GHSL)
+  file.path(processed_layer_path, "pop_density.tif"),
   # Policy
-  file.path(processed_layer_path, "fer_incentive.tif"),           # FER incentive zone binary (GSE/MASE)
-  # Socioeconomic (ISTAT census indicators)
-  file.path(processed_layer_path, "svi_unemp.tif"),               # unemployment rate
-  file.path(processed_layer_path, "svi_foreignborn.tif"),         # foreign-born % (replaces minority)
-  file.path(processed_layer_path, "svi_pov.tif"),                 # poverty rate
-  # Land use / land cover (Copernicus CORINE)
+  file.path(processed_layer_path, "fer_incentive.tif"),
+  # Socioeconomic — ISTAT census
+  file.path(processed_layer_path, "svi_unemp.tif"),
+  file.path(processed_layer_path, "svi_foreignborn.tif"),
+  file.path(processed_layer_path, "svi_pov.tif"),
+  # Socioeconomic — Zenodo / Nature Scientific Data 2025 (DOI 10.5281/zenodo.11121790)
+  file.path(processed_layer_path, "zenodo_gdp_pc.tif"),
+  file.path(processed_layer_path, "zenodo_inst_quality.tif"),
+  # Land use / land cover (binary — no scaling)
   file.path(processed_layer_path, "lulc_forest.tif"),
   file.path(processed_layer_path, "lulc_grassland.tif"),
   file.path(processed_layer_path, "lulc_shrubland.tif"),
@@ -42,103 +86,56 @@ cov.filePaths <- c(
   file.path(processed_layer_path, "lulc_agricultural.tif"),
   file.path(processed_layer_path, "lulc_developed.tif"),
   file.path(processed_layer_path, "lulc_other.tif"),
-  # Italian NUTS-1 macro-regions (binary rasters, 1 = in region)
-  file.path(processed_layer_path, "region_nordovest.tif"),        # Piemonte, VdA, Liguria, Lombardia
-  file.path(processed_layer_path, "region_nordest.tif"),          # Trentino-AA, Veneto, FVG, Emilia-R
-  file.path(processed_layer_path, "region_centro.tif"),           # Toscana, Umbria, Marche, Lazio
-  file.path(processed_layer_path, "region_sud.tif"),              # Abruzzo, Molise, Campania, Puglia, Basilicata, Calabria
-  file.path(processed_layer_path, "region_isole.tif")             # Sicilia, Sardegna
+  # NUTS-1 macro-regions (binary — no scaling)
+  file.path(processed_layer_path, "region_nordovest.tif"),
+  file.path(processed_layer_path, "region_nordest.tif"),
+  file.path(processed_layer_path, "region_centro.tif"),
+  file.path(processed_layer_path, "region_sud.tif"),
+  file.path(processed_layer_path, "region_isole.tif")
 )
 
-cov.names <- c(
-  "Transmission dist",
-  "Road dist",
-  "Substation dist",
-  "Slope",
-  "Population density",
-  "FER incentive",
-  "Unemployment",
-  "Foreign born",
-  "Poverty",
-  "Forest",
-  "Grassland",
-  "Shrubland",
-  "Riparian",
-  "Vegetated",
-  "Agriculture",
-  "Developed",
-  "Other lands",
-  "region_nordovest",
-  "region_nordest",
-  "region_centro",
-  "region_sud",
-  "region_isole"
+cov_names <- c(
+  "Transmission dist", "Road dist", "Substation dist",
+  "Slope", "Population density", "FER incentive",
+  "Unemployment", "Foreign born", "Poverty",
+  "GDP per capita", "Institutional quality",
+  "Forest", "Grassland", "Shrubland", "Riparian",
+  "Vegetated", "Agriculture", "Developed", "Other lands",
+  "region_nordovest", "region_nordest", "region_centro",
+  "region_sud", "region_isole"
 )
 
-# Layers 1:9 are continuous → z-score scaled; 10:end are binary → no scaling
-raster_list <- list()
-for (i in 1:length(cov.names)) {
-  if (i < 10) {
-    raster_list[[cov.names[[i]]]] <- raster(cov.filePaths[[i]]) %>%
-      raster::scale()
-  } else {
-    raster_list[[cov.names[[i]]]] <- raster(cov.filePaths[[i]])
-  }
-}
-
-coeff_stack <- stack(raster_list)
-raster::writeRaster(coeff_stack, "./derived/covStack.tif", overwrite = TRUE)
+# Layers 1–11 are continuous → z-scored; 12+ are binary → unscaled
+build_stack(cov_paths, cov_names, scale_up_to = 11, out_path = "./derived/covStack.tif")
 
 
-# ── Solar-specific layers ─────────────────────────────────────────────────────
-# solar_capacity.tif  → PVGIS capacity factor grid (JRC)
-# env_impactScore_solar.tif → composite environmental sensitivity for solar
-# solar_lag.tif       → spatial lag of existing solar development
-
-cov.tech  <- c(file.path(processed_layer_path, "env_impactScore_solar.tif"),
-               file.path(processed_layer_path, "solar_capacity.tif"),
-               file.path(processed_layer_path, "solar_lag.tif"))
-cov.names <- c("Environmental score", "Capacity factor", "Spatial lag")
-
-raster_list <- list()
-for (i in 1:length(cov.names)) {
-  raster_list[[cov.names[[i]]]] <- raster(cov.tech[[i]]) %>% raster::scale()
-}
-
-solar_stack <- stack(raster_list)
-raster::writeRaster(solar_stack, "./derived/solar_covStack.tif", overwrite = TRUE)
+# ── Solar-specific stack ──────────────────────────────────────────────────────
+build_stack(
+  paths       = c(file.path(processed_layer_path, "env_impactScore_solar.tif"),
+                  file.path(processed_layer_path, "solar_capacity.tif"),
+                  file.path(processed_layer_path, "solar_lag.tif")),
+  layer_names = c("Environmental score", "Capacity factor", "Spatial lag"),
+  scale_up_to = 3,
+  out_path    = "./derived/solar_covStack.tif"
+)
 
 
-# ── Wind-specific layers ──────────────────────────────────────────────────────
-# wind_capacity.tif   → PVGIS / Copernicus CDS wind capacity factor grid
-# env_impactScore_wind.tif → composite environmental sensitivity for wind
-# wind_lag.tif        → spatial lag of existing wind development
-
-cov.tech  <- c(file.path(processed_layer_path, "env_impactScore_wind.tif"),
-               file.path(processed_layer_path, "wind_capacity.tif"),
-               file.path(processed_layer_path, "wind_lag.tif"))
-cov.names <- c("Environmental score", "Capacity factor", "Spatial lag")
-
-raster_list <- list()
-for (i in 1:length(cov.names)) {
-  raster_list[[cov.names[[i]]]] <- raster(cov.tech[[i]]) %>% raster::scale()
-}
-
-wind_stack <- stack(raster_list)
-raster::writeRaster(wind_stack, "./derived/wind_covStack.tif", overwrite = TRUE)
+# ── Wind-specific stack ───────────────────────────────────────────────────────
+build_stack(
+  paths       = c(file.path(processed_layer_path, "env_impactScore_wind.tif"),
+                  file.path(processed_layer_path, "wind_capacity.tif"),
+                  file.path(processed_layer_path, "wind_lag.tif")),
+  layer_names = c("Environmental score", "Capacity factor", "Spatial lag"),
+  scale_up_to = 3,
+  out_path    = "./derived/wind_covStack.tif"
+)
 
 
-# ── Future infrastructure layers ──────────────────────────────────────────────
-# Planned transmission and substations from TERNA's development plan
-
-cov.tech  <- c(file.path(processed_layer_path, "transmission_110_wPlanned.tif"),
-               file.path(processed_layer_path, "substations_110_wPlanned.tif"))
-cov.names <- c("Transmission dist", "Substation dist")
-
-raster_list <- list()
-for (i in 1:length(cov.names)) {
-  raster_list[[cov.names[[i]]]] <- raster(cov.tech[[i]]) %>% raster::scale()
-}
-
-future_stack <- stack(raster_list)
-raster::writeRaster(future_stack, "./derived/future.tif", overwrite = TRUE)
+# ── Future infrastructure stack ───────────────────────────────────────────────
+build_stack(
+  paths       = c(file.path(processed_layer_path, "transmission_110_wPlanned.tif"),
+                  file.path(processed_layer_path, "substations_110_wPlanned.tif")),
+  layer_names = c("Transmission dist", "Substation dist"),
+  scale_up_to = 2,
+  out_path    = "./derived/future.tif"
+)

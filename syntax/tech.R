@@ -45,15 +45,17 @@ solar_locations <- solar_sf %>%
 
 
 # ── SOLAR: Enrich with RSE Atlante Integrato (fv_pot_comunale_2021) ──────────
-# RSE provides total installed PV capacity (MW) per municipality as of 2021.
-# PV panels have 25–30 yr lifetimes — 2021 installations still active in 2026.
-# Threshold: >= 5 MW per comune to focus on utility-scale presence and filter
-# out communes whose totals reflect only rooftop aggregations.
+# RSE provides total installed ground-mounted PV capacity (MW) per municipality
+# as of 2021. SOURCE FILTER (applied by RSE before publication): only plants
+# with individual capacity > 100 kW are included — rooftop and small-scale
+# systems are excluded at source. PV panels have 25–30 yr lifetimes, so 2021
+# installations are still active in 2026.
+# Threshold: >= 1 MW municipal total to match GSPT's per-plant minimum.
 
 rse_solar_raw <- st_read(
   "./data/d__temp_fv_pot_comunale_2021/fv_pot_comunale_2021.shp", quiet = TRUE
 ) %>%
-  filter(VALORE >= 5) %>%
+  filter(VALORE >= 1) %>%
   st_transform(italy_crs) %>%
   st_centroid() %>%
   st_join(region_boundaries %>% select(NUTS_NAME), join = st_within) %>%
@@ -71,7 +73,7 @@ rse_solar_new <- rse_solar_raw %>%
     radius_m        = sqrt(area_m2 / pi)
   )
 
-message("RSE solar: ", nrow(rse_solar_raw), " comuni >= 5 MW; ",
+message("RSE solar: ", nrow(rse_solar_raw), " comuni >= 1 MW; ",
         nrow(rse_solar_new), " new (not already in GSPT mask)")
 
 # Merge RSE into mask (so absence sampling avoids these locations too)
@@ -154,8 +156,12 @@ wind_locations <- wind_sf %>%
 
 # ── WIND: Enrich with RSE Atlante Integrato (eo_pot_comunale_2019) ───────────
 # RSE provides total installed wind capacity (MW) per municipality as of 2019.
+# Sources: GSE incentivized-plant register, The Wind Power database, Sentinel-2
+# satellite imagery, ISTAT administrative boundaries.
+# No explicit minimum turbine size is stated (unlike the solar file), but all
+# source databases are utility-scale focused; micro-wind is negligible in Italy.
 # Wind turbines have 20–25 yr lifetimes — 2019 installations still active 2026.
-# Threshold: >= 1 MW to include any meaningful wind presence.
+# Threshold: >= 1 MW per comune to filter any residual micro-wind entries.
 
 rse_wind_raw <- st_read(
   "./data/d__temp_eo_pot_comunale_2019/eo_pot_comunale_2019.shp", quiet = TRUE

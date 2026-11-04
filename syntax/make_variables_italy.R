@@ -21,9 +21,11 @@ save_var <- function(r, filename) {
 
 
 # ── 1. Slope ──────────────────────────────────────────────────────────────────
-# Source: SRTM 3 arc-second DEM via geodata (no registration needed)
+# Source: SRTM 30 arc-second DEM via geodata (country download, no lon/lat needed)
+# elevation_3s requires individual tile coordinates; elevation_30s accepts country.
+# 30 arc-sec (~925 m) is resampled to the 1 km grid by snap() anyway.
 message("1. Slope")
-dem   <- geodata::elevation_3s(country = "ITA", path = cache_path)
+dem   <- geodata::elevation_30s(country = "ITA", path = cache_path)
 slope <- terrain(snap(dem), "slope", unit = "degrees")
 save_var(slope, "slope.tif")
 
@@ -31,7 +33,7 @@ save_var(slope, "slope.tif")
 # ── 2. Population density ─────────────────────────────────────────────────────
 # Source: WorldPop 2020, 1 arc-minute (~2 km) resampled to 1 km
 message("2. Population density")
-pop <- geodata::population(year = 2020, res = 1, path = cache_path)
+pop <- geodata::population(year = 2020, res = 0.5, path = cache_path)
 save_var(snap(pop), "pop_density.tif")
 
 
@@ -52,15 +54,22 @@ save_var(distance(roads_rast) |> snap(), "roads_qgis.tif")
 # ── 3b. Distance to transmission lines & substations (OSM) ───────────────────
 # TERNA does not publish GIS downloads. OSM has comprehensive tagging of the
 # Italian power grid (power=line, power=substation) — same cached PBF used above.
+#
+# 'power' and 'voltage' are non-standard OSM tags: they land in other_tags by
+# default and are invisible to SQL WHERE clauses. extra_tags forces osmextract
+# to promote them to real columns. force_vectortranslate = TRUE rebuilds the
+# cached GeoPackage so the new columns are actually present.
 message("3b. Transmission lines & substations distance (OSM)")
 
 # Transmission lines ≥ 110 kV
 tx_sf <- osmextract::oe_get(
   "Italy",
-  layer              = "lines",
-  query              = "SELECT geometry, voltage FROM lines WHERE power = 'line'",
-  download_directory = cache_path,
-  quiet              = TRUE
+  layer                = "lines",
+  extra_tags           = c("power", "voltage"),
+  force_vectortranslate = TRUE,
+  query                = "SELECT geometry, voltage FROM lines WHERE power = 'line'",
+  download_directory   = cache_path,
+  quiet                = TRUE
 ) |> filter(!is.na(voltage))
 # voltage field is a string in OSM (e.g. "132000", "220000;380000")
 tx_sf <- tx_sf |>
@@ -75,11 +84,15 @@ save_var(distance(tx_rast) |> snap(), "transmission_110_wPlanned.tif")
 # Substations — OSM stores them as both points and multipolygons
 subs_pts  <- osmextract::oe_get(
   "Italy", layer = "points",
+  extra_tags           = c("power"),
+  force_vectortranslate = TRUE,
   query = "SELECT geometry FROM points WHERE power = 'substation'",
   download_directory = cache_path, quiet = TRUE
 )
 subs_poly <- osmextract::oe_get(
   "Italy", layer = "multipolygons",
+  extra_tags           = c("power"),
+  force_vectortranslate = TRUE,
   query = "SELECT geometry FROM multipolygons WHERE power = 'substation'",
   download_directory = cache_path, quiet = TRUE
 )
@@ -164,7 +177,8 @@ message("8. Spatial lag")
 w <- focalMat(base_ras, d = 50000, type = "circle")
 
 for (tech in c("solar", "wind")) {
-  exist      <- rast(paste0("./derived/", tech, "_hull_existing.tif"))
+  exist      <- rast(paste0("./derived/", tech, "_hull_existing.tif")) |>
+                snap(method = "near")   # realign extent to base_ras before focal
   exist[is.na(exist)] <- 0
   lag        <- focal(exist, w = w, fun = "mean", na.rm = TRUE) |> mask(base_ras)
   save_var(lag, paste0(tech, "_lag.tif"))

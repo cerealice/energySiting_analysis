@@ -48,9 +48,10 @@ run_script <- function(path) {
 run_setup <- function() {
   run_script("syntax/make_base_raster.R")    # Italy_base_raster.tif
   run_script("syntax/make_variables_italy.R") # predictor rasters
-  run_script("syntax/make_socioeconomic.R")   # svi_pov, svi_unemp, svi_foreignborn
-  run_script("syntax/make_natura2000.R")      # env_impactScore_solar/wind
-  run_script("syntax/stack.R")               # covStack.tif, solar/wind covStacks
+  run_script("syntax/make_socioeconomic.R")        # svi_pov, svi_unemp, svi_foreignborn
+  run_script("syntax/make_zenodo_socioeconomic.R") # zenodo_gdp_pc, zenodo_inst_quality
+  run_script("syntax/make_natura2000.R")           # env_impactScore_solar/wind
+  run_script("syntax/stack.R")                     # covStack.tif, solar/wind covStacks
 }
 
 
