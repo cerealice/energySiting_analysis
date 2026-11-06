@@ -68,8 +68,6 @@ cov_paths <- c(
   file.path(processed_layer_path, "slope.tif"),
   # Demographics
   file.path(processed_layer_path, "pop_density.tif"),
-  # Policy
-  file.path(processed_layer_path, "fer_incentive.tif"),
   # Socioeconomic — ISTAT census
   file.path(processed_layer_path, "svi_unemp.tif"),
   file.path(processed_layer_path, "svi_foreignborn.tif"),
@@ -77,6 +75,11 @@ cov_paths <- c(
   # Socioeconomic — Zenodo / Nature Scientific Data 2025 (DOI 10.5281/zenodo.11121790)
   file.path(processed_layer_path, "zenodo_gdp_pc.tif"),
   file.path(processed_layer_path, "zenodo_inst_quality.tif"),
+  # Policy — fer_incentive is constant 1 across all of Italy (GSE FER scheme is
+  # national, no regional variation). A constant predictor carries zero information
+  # and is collinear with the intercept. Uncomment to restore if zone-specific
+  # incentive data become available.
+  # file.path(processed_layer_path, "fer_incentive.tif"),
   # Land use / land cover (binary — no scaling)
   file.path(processed_layer_path, "lulc_forest.tif"),
   file.path(processed_layer_path, "lulc_grassland.tif"),
@@ -96,17 +99,18 @@ cov_paths <- c(
 
 cov_names <- c(
   "Transmission dist", "Road dist", "Substation dist",
-  "Slope", "Population density", "FER incentive",
+  "Slope", "Population density",
   "Unemployment", "Foreign born", "Poverty",
   "GDP per capita", "Institutional quality",
+  # "FER incentive",   # commented out — constant across Italy, see cov_paths above
   "Forest", "Grassland", "Shrubland", "Riparian",
   "Vegetated", "Agriculture", "Developed", "Other lands",
   "region_nordovest", "region_nordest", "region_centro",
   "region_sud", "region_isole"
 )
 
-# Layers 1–11 are continuous → z-scored; 12+ are binary → unscaled
-build_stack(cov_paths, cov_names, scale_up_to = 11, out_path = "./derived/covStack.tif")
+# Layers 1–10 are continuous → z-scored; 11+ are binary → unscaled
+build_stack(cov_paths, cov_names, scale_up_to = 10, out_path = "./derived/covStack.tif")
 
 
 # ── Solar-specific stack ──────────────────────────────────────────────────────

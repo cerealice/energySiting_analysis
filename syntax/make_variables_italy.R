@@ -64,12 +64,11 @@ message("3b. Transmission lines & substations distance (OSM)")
 # Transmission lines ≥ 110 kV
 tx_sf <- osmextract::oe_get(
   "Italy",
-  layer                = "lines",
-  extra_tags           = c("power", "voltage"),
-  force_vectortranslate = TRUE,
-  query                = "SELECT geometry, voltage FROM lines WHERE power = 'line'",
-  download_directory   = cache_path,
-  quiet                = TRUE
+  layer              = "lines",
+  extra_tags         = c("power", "voltage"),
+  query              = "SELECT geometry, voltage FROM lines WHERE power = 'line'",
+  download_directory = cache_path,
+  quiet              = TRUE
 ) |> filter(!is.na(voltage))
 # voltage field is a string in OSM (e.g. "132000", "220000;380000")
 tx_sf <- tx_sf |>
@@ -84,23 +83,21 @@ save_var(distance(tx_rast) |> snap(), "transmission_110_wPlanned.tif")
 # Substations — OSM stores them as both points and multipolygons
 subs_pts  <- osmextract::oe_get(
   "Italy", layer = "points",
-  extra_tags           = c("power"),
-  force_vectortranslate = TRUE,
+  extra_tags         = c("power"),
   query = "SELECT geometry FROM points WHERE power = 'substation'",
   download_directory = cache_path, quiet = TRUE
 )
 subs_poly <- osmextract::oe_get(
   "Italy", layer = "multipolygons",
-  extra_tags           = c("power"),
-  force_vectortranslate = TRUE,
+  extra_tags         = c("power"),
   query = "SELECT geometry FROM multipolygons WHERE power = 'substation'",
   download_directory = cache_path, quiet = TRUE
 )
 subs_sf    <- bind_rows(
-  st_centroid(subs_poly) |> select(geometry),
-  subs_pts |> select(geometry)
+  subs_poly |> st_transform(italy_crs) |> st_centroid() |> select(geometry),
+  subs_pts  |> st_transform(italy_crs) |> select(geometry)
 )
-subs_rast  <- rasterize(vect(subs_sf) |> project(crs(base_ras)), base_ras, field = 1)
+subs_rast  <- rasterize(vect(subs_sf), base_ras, field = 1)
 save_var(distance(subs_rast) |> snap(), "substations_110_qgis.tif")
 save_var(distance(subs_rast) |> snap(), "substations_110_wPlanned.tif")
 

@@ -18,7 +18,7 @@ var_labels <- c(
   "sub"              = "Substation dist",
   "slope"            = "Slope",
   "pop"              = "Population density",
-  "fer"              = "FER incentive",
+  # "fer"            = "FER incentive",   # excluded — constant across Italy
   "unemploy"         = "Unemployment",
   "foreignborn"      = "Foreign born",
   "poverty"          = "Poverty",
@@ -43,7 +43,8 @@ var_labels <- c(
 )
 
 # Shared model formula — defined here so drop_na() can reference it in both loops
-region_model <- treat ~ tx + roads + sub + slope + pop + fer + unemploy + foreignborn + poverty + gdp_pc + inst_quality +
+region_model <- treat ~ tx + roads + sub + slope + pop + unemploy + foreignborn + poverty + gdp_pc + inst_quality +
+  # fer +   # excluded — constant across Italy (GSE FER scheme is national)
   lulc_forest + lulc_grassland + lulc_shrubland + lulc_riparian + lulc_sparse + lulc_agriculture + lulc_developed + lulc_other +
   region_nordovest + region_nordest + region_centro + region_sud + region_isole +
   env + cf + lag
@@ -69,7 +70,8 @@ for(i in 1:10){
                  i, paste(sprintf("  %-25s %d", names(na_cols), na_cols), collapse = "\n")))
   }
 
-  glm1_solar <- glm(treat ~ tx + roads + sub + slope + pop + fer + unemploy + foreignborn + poverty + gdp_pc + inst_quality +
+  glm1_solar <- glm(treat ~ tx + roads + sub + slope + pop + unemploy + foreignborn + poverty + gdp_pc + inst_quality +
+                      # fer +   # excluded — constant across Italy
                       lulc_forest + lulc_grassland + lulc_shrubland + lulc_riparian + lulc_sparse + lulc_agriculture + lulc_developed + lulc_other +
                       region_nordovest + region_nordest + region_centro + region_sud + region_isole +
                       env + cf + lag,
@@ -104,7 +106,8 @@ s_dat <- solar.cov.bg %>%
 write.csv(s_dat, "./derived/solar.csv", row.names = FALSE)
 
 
-glm1_solar <- glm(treat ~ tx + roads + sub + slope + pop + fer + unemploy + foreignborn + poverty + gdp_pc + inst_quality +
+glm1_solar <- glm(treat ~ tx + roads + sub + slope + pop + unemploy + foreignborn + poverty + gdp_pc + inst_quality +
+                    # fer +   # excluded — constant across Italy
                     lulc_forest + lulc_grassland + lulc_shrubland + lulc_riparian + lulc_sparse + lulc_agriculture + lulc_developed + lulc_other +
                     region_nordovest + region_nordest + region_centro + region_sud + region_isole +
                     env + cf + lag,
@@ -214,7 +217,8 @@ for(i in 1:10){
                  i, paste(sprintf("  %-25s %d", names(na_cols), na_cols), collapse = "\n")))
   }
 
-  glm1_wind <- glm(treat ~ tx + roads + sub + slope + pop + fer + unemploy + foreignborn + poverty + gdp_pc + inst_quality +
+  glm1_wind <- glm(treat ~ tx + roads + sub + slope + pop + unemploy + foreignborn + poverty + gdp_pc + inst_quality +
+                      # fer +   # excluded — constant across Italy
                       lulc_forest + lulc_grassland + lulc_shrubland + lulc_riparian + lulc_sparse + lulc_agriculture + lulc_developed + lulc_other +
                       region_nordovest + region_nordest + region_centro + region_sud + region_isole +
                       env + cf + lag,
@@ -249,7 +253,8 @@ w_dat <- wind.cov.bg %>%
 write.csv(w_dat, "./derived/wind.csv", row.names = FALSE)
 
 
-glm1_wind <- glm(treat ~ tx + roads + sub + slope + pop + fer + unemploy + foreignborn + poverty + gdp_pc + inst_quality +
+glm1_wind <- glm(treat ~ tx + roads + sub + slope + pop + unemploy + foreignborn + poverty + gdp_pc + inst_quality +
+                    # fer +   # excluded — constant across Italy
                     lulc_forest + lulc_grassland + lulc_shrubland + lulc_riparian + lulc_sparse + lulc_agriculture + lulc_developed + lulc_other +
                     region_nordovest + region_nordest + region_centro + region_sud + region_isole +
                     env + cf + lag,
@@ -379,7 +384,7 @@ imp <- rbind(
     "sub"            = "Substation dist",
     "slope"          = "Slope",
     "pop"            = "Population density",
-    "fer"            = "FER incentive",
+    # "fer"          = "FER incentive",   # excluded — constant across Italy
     "unemploy"       = "Unemployment",
     "foreignborn"    = "Foreign born",
     "poverty"        = "Poverty",
@@ -405,3 +410,9 @@ imp <- rbind(
 
 save(imp, solar_resamps, wind_resamps, rst_s, rst_w, file = "./derived/model_results.RData")
 load("./derived/model_results.RData")
+
+# Save model objects for calibration and spatial CV in performance.R
+saveRDS(mdl_solarrf,    "./derived/mdl_solarrf.rds")
+saveRDS(mdl_windrf,     "./derived/mdl_windrf.rds")
+saveRDS(mdl_solarxg,    "./derived/mdl_solarxg.rds")
+saveRDS(mdl_windxg,     "./derived/mdl_windxg.rds")

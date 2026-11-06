@@ -1,0 +1,579 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Renewable Energy Siting in Italy</title>
+
+  <!-- Reveal.js -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/dist/reveal.css" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/dist/theme/white.css" />
+  <!-- Highlight.js for code -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/plugin/highlight/monokai.css" />
+
+  <style>
+    :root {
+      --accent: #1a6b3c;
+      --accent2: #d47c0f;
+      --light: #f4f9f6;
+      --dark: #1a2e22;
+    }
+
+    .reveal { font-family: 'Segoe UI', system-ui, sans-serif; }
+    .reveal h1, .reveal h2, .reveal h3 { font-weight: 700; color: var(--dark); }
+    .reveal h1 { font-size: 1.9em; }
+    .reveal h2 { font-size: 1.3em; color: var(--accent); border-bottom: 3px solid var(--accent); padding-bottom: 0.2em; margin-bottom: 0.6em; }
+    .reveal h3 { font-size: 1em; color: var(--accent2); }
+    .reveal p, .reveal li { font-size: 0.72em; }
+    .reveal ul { list-style: none; padding-left: 0; }
+    .reveal ul li::before { content: "▸ "; color: var(--accent); font-weight: bold; }
+    .reveal .slides section { text-align: left; }
+
+    /* Title slide */
+    .title-slide { text-align: center !important; background: linear-gradient(135deg, var(--dark) 0%, #2d6a4f 100%); color: white !important; }
+    .title-slide h1 { color: white !important; font-size: 1.7em; border: none; }
+    .title-slide h2 { color: #95d5b2 !important; border: none; font-size: 1em; font-weight: 400; }
+    .title-slide .byline { margin-top: 1.5em; font-size: 0.65em; color: #b7e4c7; }
+    .title-slide .tag { display: inline-block; background: rgba(255,255,255,0.15); border-radius: 20px; padding: 0.2em 0.8em; margin: 0.2em; font-size: 0.6em; }
+
+    /* Columns */
+    .cols { display: flex; gap: 1.5em; align-items: flex-start; }
+    .cols > * { flex: 1; }
+    .cols .w30 { flex: 0 0 30%; }
+    .cols .w40 { flex: 0 0 40%; }
+    .cols .w60 { flex: 0 0 60%; }
+    .cols .w65 { flex: 0 0 65%; }
+    .cols .w35 { flex: 0 0 35%; }
+
+    /* Figures */
+    .fig-box { text-align: center; }
+    .fig-box img { max-width: 100%; max-height: 420px; border-radius: 8px; box-shadow: 0 4px 16px rgba(0,0,0,0.12); }
+    .fig-box .caption { font-size: 0.5em; color: #666; margin-top: 0.4em; font-style: italic; }
+
+    /* Cards */
+    .card { background: var(--light); border-left: 4px solid var(--accent); border-radius: 6px; padding: 0.7em 1em; margin-bottom: 0.5em; }
+    .card.orange { border-color: var(--accent2); }
+    .card h3 { margin: 0 0 0.3em; font-size: 0.8em; }
+    .card ul li { font-size: 0.65em; }
+
+    /* Metric badges */
+    .metric { display: inline-block; background: var(--accent); color: white; border-radius: 8px; padding: 0.4em 0.8em; margin: 0.2em; font-size: 0.65em; text-align: center; }
+    .metric .val { font-size: 1.5em; font-weight: 700; display: block; }
+    .metric.orange { background: var(--accent2); }
+
+    /* Step boxes */
+    .step { display: flex; align-items: center; gap: 0.6em; margin-bottom: 0.4em; }
+    .step-num { background: var(--accent); color: white; border-radius: 50%; width: 1.5em; height: 1.5em; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 0.75em; flex-shrink: 0; }
+    .step p { margin: 0; font-size: 0.65em; }
+
+    /* Table */
+    .perf-table { width: 100%; border-collapse: collapse; font-size: 0.6em; }
+    .perf-table th { background: var(--accent); color: white; padding: 0.4em 0.6em; text-align: left; }
+    .perf-table td { padding: 0.35em 0.6em; border-bottom: 1px solid #ddd; }
+    .perf-table tr:nth-child(even) td { background: var(--light); }
+    .perf-table .best { font-weight: 700; color: var(--accent); }
+
+    /* Covariate grid */
+    .cov-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 0.5em; }
+
+    /* Highlight box */
+    .highlight-box { background: linear-gradient(135deg, #e8f5e9, #f1f8e9); border: 2px solid var(--accent); border-radius: 10px; padding: 0.8em 1.2em; margin-top: 0.6em; }
+    .highlight-box p { font-size: 0.65em; margin: 0; }
+
+    /* Conclusion items */
+    .concl { background: white; border: 1px solid #ddd; border-radius: 8px; padding: 0.6em 0.9em; margin-bottom: 0.4em; display: flex; align-items: flex-start; gap: 0.5em; }
+    .concl .icon { font-size: 1.1em; flex-shrink: 0; margin-top: 0.05em; }
+    .concl p { margin: 0; font-size: 0.63em; }
+
+    /* Progress dots */
+    .reveal .progress { color: var(--accent); }
+
+    /* Section header slides */
+    .section-slide { background: var(--light) !important; }
+    .section-slide h2 { font-size: 2em; color: var(--accent); border: none; text-align: center; }
+    .section-slide p { text-align: center; color: #555; }
+  </style>
+</head>
+<body>
+<div class="reveal">
+<div class="slides">
+
+<!-- ═══════════════════════════════════════════════════════════
+     SLIDE 1 — TITLE
+════════════════════════════════════════════════════════════ -->
+<section class="title-slide">
+  <h1>Mapping Renewable Energy Siting<br>in Italy</h1>
+  <h2>A Machine Learning Presence-Background Approach</h2>
+  <div class="byline">
+    <p><strong>Alice Di Bella</strong> · CMCC Foundation</p>
+    <div>
+      <span class="tag">Solar PV</span>
+      <span class="tag">Wind</span>
+      <span class="tag">Species Distribution Models</span>
+      <span class="tag">Random Forest</span>
+      <span class="tag">Gradient Boosting</span>
+      <span class="tag">Regional Heterogeneity</span>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════════
+     SLIDE 2 — MOTIVATION
+════════════════════════════════════════════════════════════ -->
+<section>
+  <h2>Motivation</h2>
+  <div class="cols">
+    <div>
+      <div class="card">
+        <h3>Italy's Energy Transition</h3>
+        <ul>
+          <li>EU target: 42.5% renewable energy by 2030</li>
+          <li>Italy needs massive solar &amp; wind deployment</li>
+          <li>Competing land-use pressures: agriculture, nature, heritage</li>
+        </ul>
+      </div>
+      <div class="card orange">
+        <h3>The Siting Challenge</h3>
+        <ul>
+          <li>Where do plants get built, and why?</li>
+          <li>Which environmental, social &amp; infrastructural factors drive location choices?</li>
+          <li>Do drivers vary across Italian macro-regions?</li>
+        </ul>
+      </div>
+    </div>
+    <div>
+      <div class="card">
+        <h3>Our Approach</h3>
+        <ul>
+          <li><strong>SDM-inspired</strong> presence-background modelling</li>
+          <li>Treat existing plant locations as "presences"</li>
+          <li>Randomly sample background sites as pseudo-absences</li>
+          <li>Fit four ML classifiers, compare performance &amp; drivers</li>
+          <li>Predict suitability across all suitable areas in Italy</li>
+        </ul>
+      </div>
+      <div class="highlight-box">
+        <p><strong>Key question:</strong> Can we learn the spatial fingerprint of past siting decisions to predict future high-probability locations and reveal the trade-offs involved?</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════════
+     SLIDE 3 — DATA: PRESENCE LOCATIONS
+════════════════════════════════════════════════════════════ -->
+<section>
+  <h2>Data — Existing Plant Locations</h2>
+  <div class="cols">
+    <div class="w65">
+      <div class="fig-box">
+        <img src="fig/original/f1.png" alt="Plant locations and pseudo-absence zones" />
+        <div class="caption">Top: Existing solar (left) and wind (right) plants coloured by installed capacity. Bottom: 10 pseudo-absence background groups for each technology.</div>
+      </div>
+    </div>
+    <div class="w35">
+      <div class="card">
+        <h3>Solar PV</h3>
+        <ul>
+          <li>Source: <strong>RSE Atlante</strong> (national registry)</li>
+          <li>Ground-mounted utility-scale plants</li>
+          <li>Concentrated in Po Valley, Puglia, Sicily</li>
+        </ul>
+      </div>
+      <div class="card orange">
+        <h3>Wind</h3>
+        <ul>
+          <li>Source: <strong>GWPT</strong> (Global Wind Power Tracker)</li>
+          <li>Onshore turbines only</li>
+          <li>Concentrated in Apennines, Sardinia, Calabria</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>Suitable Area Mask</h3>
+        <ul>
+          <li>Restricted to technically feasible areas</li>
+          <li>Excludes protected areas, urban zones, water bodies</li>
+          <li>CRS: EPSG:3035 (ETRS89 LAEA)</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════════
+     SLIDE 4 — PSEUDO-ABSENCE DESIGN
+════════════════════════════════════════════════════════════ -->
+<section>
+  <h2>Pseudo-Absence Design</h2>
+  <div class="cols">
+    <div>
+      <p>Absence of a plant does not mean the site is unsuitable — background sampling must be done carefully.</p>
+
+      <div class="step"><div class="step-num">1</div><p><strong>Stratified sampling</strong> within NUTS-2 regions to ensure geographic coverage</p></div>
+      <div class="step"><div class="step-num">2</div><p><strong>10 independent background groups</strong> generated via repeated random draws</p></div>
+      <div class="step"><div class="step-num">3</div><p><strong>Buffer exclusion</strong> around known presence locations (5 km for solar)</p></div>
+      <div class="step"><div class="step-num">4</div><p>Each background group → one full model fit (GLM, Lasso, RF, GBM)</p></div>
+      <div class="step"><div class="step-num">5</div><p><strong>Model selection</strong>: group with median AIC (5th lowest) used for final inference</p></div>
+
+      <div class="highlight-box">
+        <p><strong>Why median-AIC?</strong> Avoids selecting the best-fitting group by chance; the median group represents a typical, not exceptional, background realisation.</p>
+      </div>
+    </div>
+    <div>
+      <div class="card">
+        <h3>Sample sizes (median group)</h3>
+        <ul>
+          <li>Solar: ~2,500 presence + ~12,000 background</li>
+          <li>Wind: ~1,200 presence + ~6,000 background</li>
+        </ul>
+      </div>
+      <div class="card orange">
+        <h3>Covariate extraction</h3>
+        <ul>
+          <li>All predictors extracted at plant centroid (presence) or background point</li>
+          <li>Raster resolution: ~1 km (ETRS89 LAEA)</li>
+          <li>Zonal aggregation for polygon presences</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════════
+     SLIDE 5 — COVARIATES
+════════════════════════════════════════════════════════════ -->
+<section>
+  <h2>Covariates</h2>
+  <div class="cov-grid">
+    <div class="card">
+      <h3>Infrastructure</h3>
+      <ul>
+        <li><strong>tx</strong> — Distance to transmission lines (km)</li>
+        <li><strong>roads</strong> — Distance to major roads (km)</li>
+        <li><strong>sub</strong> — Distance to substations (km)</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h3>Topography &amp; Environment</h3>
+      <ul>
+        <li><strong>slope</strong> — Terrain slope (°)</li>
+        <li><strong>env</strong> — Environmental protection score</li>
+        <li><strong>cf</strong> — Wind capacity factor (wind only)</li>
+      </ul>
+    </div>
+    <div class="card orange">
+      <h3>Socioeconomic</h3>
+      <ul>
+        <li><strong>pop</strong> — Population density (inh/km²)</li>
+        <li><strong>unemploy</strong> — Unemployment rate (%)</li>
+        <li><strong>poverty</strong> — At-risk-of-poverty rate (%)</li>
+        <li><strong>gdp_pc</strong> — GDP per capita (€)</li>
+        <li><strong>inst_quality</strong> — Institutional quality index</li>
+        <li><strong>lag</strong> — Spatial lag of wind plants (wind only)</li>
+      </ul>
+    </div>
+    <div class="card orange">
+      <h3>Land Use / Land Cover</h3>
+      <ul>
+        <li>8 binary LULC classes (Corine Land Cover)</li>
+        <li>Forest, Grassland, Shrubland, Riparian</li>
+        <li>Vegetated, Agriculture, Developed, Other</li>
+        <li>+ 21 NUTS-2 region fixed effects</li>
+      </ul>
+    </div>
+  </div>
+  <p style="font-size:0.55em; margin-top:0.5em; color:#555;">All continuous predictors standardised (mean=0, SD=1) prior to modelling. LULC dummies are excluded from logistic coefficient plots due to quasi-complete separation but are included in tree-based models.</p>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════════
+     SLIDE 6 — MODELLING FRAMEWORK
+════════════════════════════════════════════════════════════ -->
+<section>
+  <h2>Modelling Framework</h2>
+  <div class="cols">
+    <div>
+      <div class="card">
+        <h3>Four Models</h3>
+        <ul>
+          <li><strong>GLM</strong> — Logistic regression (benchmark)</li>
+          <li><strong>Lasso</strong> — L1-penalised logistic (glmnet); λ via 10-fold CV</li>
+          <li><strong>RF</strong> — Random Forest (caret + ranger); 500 trees, mtry tuned</li>
+          <li><strong>GBM</strong> — Gradient Boosting (caret + xgboost); shrinkage + depth tuned</li>
+        </ul>
+      </div>
+      <div class="card orange">
+        <h3>Cross-Validation</h3>
+        <ul>
+          <li><strong>Standard 10-fold CV</strong>: overall discrimination (AUC-ROC)</li>
+          <li><strong>Spatial block CV</strong>: tests for spatial overfitting; blocks defined by clustering presence locations into geographic groups</li>
+        </ul>
+      </div>
+    </div>
+    <div>
+      <div class="card">
+        <h3>Output</h3>
+        <ul>
+          <li>Predicted suitability maps (0–1 probability) for all 8 model × technology combinations</li>
+          <li>Variable importance (RF/GBM: permutation importance; GLM/Lasso: standardised coefficients)</li>
+          <li>Regional effects via GLMM with NUTS-2 random slopes</li>
+        </ul>
+      </div>
+      <div class="highlight-box">
+        <p><strong>Spatial block CV</strong> reveals whether models generalise across space or merely interpolate within the training range — critical for policy use.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════════
+     SLIDE 7 — SPATIAL CV BLOCKS
+════════════════════════════════════════════════════════════ -->
+<section>
+  <h2>Spatial Cross-Validation</h2>
+  <div class="cols">
+    <div class="w60">
+      <div class="fig-box">
+        <img src="fig/original/f_spatial_cv_comparison.png" alt="Spatial CV comparison" />
+        <div class="caption">Comparison of standard 10-fold CV vs spatial block CV AUC-ROC for each model and technology. A large drop indicates spatial overfitting.</div>
+      </div>
+    </div>
+    <div class="w40">
+      <div class="fig-box" style="margin-bottom: 0.6em;">
+        <img src="fig/original/spatial_blocks_solar.png" alt="Solar spatial blocks" style="max-height:160px;" />
+        <div class="caption">Solar — spatial fold blocks</div>
+      </div>
+      <div class="fig-box">
+        <img src="fig/original/spatial_blocks_wind.png" alt="Wind spatial blocks" style="max-height:160px;" />
+        <div class="caption">Wind — spatial fold blocks</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════════
+     SLIDE 8 — MODEL PERFORMANCE
+════════════════════════════════════════════════════════════ -->
+<section>
+  <h2>Model Performance</h2>
+  <div class="cols">
+    <div class="w60">
+      <div class="fig-box">
+        <img src="fig/original/f_performance_roc.png" alt="ROC curves" />
+        <div class="caption">ROC curves for all models across 10 CV folds. Shaded bands = ±1 SD across folds.</div>
+      </div>
+    </div>
+    <div class="w40">
+      <p>Mean AUC-ROC (10-fold CV):</p>
+      <table class="perf-table">
+        <thead>
+          <tr><th>Technology</th><th>Model</th><th>AUC</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>Solar</td><td>GBM</td><td class="best">best</td></tr>
+          <tr><td>Solar</td><td>RF</td><td></td></tr>
+          <tr><td>Solar</td><td>Lasso</td><td></td></tr>
+          <tr><td>Solar</td><td>GLM</td><td></td></tr>
+          <tr><td>Wind</td><td>GBM</td><td class="best">best</td></tr>
+          <tr><td>Wind</td><td>RF</td><td></td></tr>
+          <tr><td>Wind</td><td>Lasso</td><td></td></tr>
+          <tr><td>Wind</td><td>GLM</td><td></td></tr>
+        </tbody>
+      </table>
+      <div class="highlight-box" style="margin-top:0.6em;">
+        <p>Tree-based models (RF, GBM) outperform linear ones, reflecting non-linear interactions between infrastructure access, land cover, and location suitability.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════════
+     SLIDE 9 — VARIABLE IMPORTANCE & COEFFICIENTS
+════════════════════════════════════════════════════════════ -->
+<section>
+  <h2>Variable Importance &amp; Coefficients</h2>
+  <div class="fig-box">
+    <img src="fig/original/f2.png" alt="Coefficient plots and variable importance" style="max-height: 450px;" />
+    <div class="caption">
+      <strong>Top rows:</strong> Logistic regression coefficients across all 10 background groups (dots) and median-AIC group with 95% CI (error bars). Red = significant (p &lt; 0.05). LULC dummies excluded (quasi-complete separation).
+      <strong>Bottom rows:</strong> RF and GBM permutation importance (%) — includes all variables.
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════════
+     SLIDE 10 — KEY DRIVERS (text summary)
+════════════════════════════════════════════════════════════ -->
+<section>
+  <h2>Key Drivers</h2>
+  <div class="cols">
+    <div>
+      <h3>Solar PV</h3>
+      <div class="card">
+        <h3>Positive drivers (increase probability)</h3>
+        <ul>
+          <li>Proximity to substations &amp; transmission lines</li>
+          <li>Flat terrain (low slope)</li>
+          <li>Agricultural land cover</li>
+          <li>Southern regions (higher irradiance)</li>
+        </ul>
+      </div>
+      <div class="card orange">
+        <h3>Negative drivers (reduce probability)</h3>
+        <ul>
+          <li>High population density</li>
+          <li>Protected natural areas (env score)</li>
+          <li>Forested land cover</li>
+        </ul>
+      </div>
+    </div>
+    <div>
+      <h3>Wind</h3>
+      <div class="card">
+        <h3>Positive drivers</h3>
+        <ul>
+          <li>High wind capacity factor</li>
+          <li>Existing wind clusters (spatial lag)</li>
+          <li>Proximity to transmission infrastructure</li>
+          <li>Ridgeline / elevated terrain</li>
+        </ul>
+      </div>
+      <div class="card orange">
+        <h3>Negative drivers</h3>
+        <ul>
+          <li>Environmental protection score</li>
+          <li>Dense population areas</li>
+          <li>Proximity to major roads (access paradox)</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════════
+     SLIDE 11 — SPATIAL PREDICTIONS
+════════════════════════════════════════════════════════════ -->
+<section>
+  <h2>Spatial Predictions</h2>
+  <div class="fig-box">
+    <img src="fig/original/f3.png" alt="Probability maps and regional bar charts" style="max-height: 450px;" />
+    <div class="caption">
+      <strong>Left (A):</strong> Predicted suitability (0–1) across suitable areas of Italy for each of the 8 model × technology combinations (yellow = high probability, purple = low).
+      <strong>Right (B):</strong> Mean predicted probability by NUTS-1 macro-region, by model and technology.
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════════
+     SLIDE 12 — REGIONAL HETEROGENEITY
+════════════════════════════════════════════════════════════ -->
+<section>
+  <h2>Regional Heterogeneity (GLMM)</h2>
+  <div class="cols">
+    <div class="w65">
+      <div class="fig-box">
+        <img src="fig/original/f4.png" alt="Regional heterogeneity" style="max-height: 420px;" />
+        <div class="caption">
+          <strong>A:</strong> NUTS-2 choropleth maps of random-slope effects for selected predictors (solar).
+          <strong>B:</strong> Same for wind. Point-ranges show posterior mean ± 1.96 SE per region.
+        </div>
+      </div>
+    </div>
+    <div class="w35">
+      <div class="card">
+        <h3>Method</h3>
+        <ul>
+          <li>Mixed-effects logistic regression (lme4)</li>
+          <li>21 NUTS-2 regions as grouping factor</li>
+          <li>Random slopes for key predictors</li>
+          <li>Fallback: stratified per-region GLM if GLMM singular</li>
+        </ul>
+      </div>
+      <div class="card orange">
+        <h3>Findings</h3>
+        <ul>
+          <li>Population density effect varies strongly: more negative in densely populated North</li>
+          <li>Transmission distance effect consistent across regions</li>
+          <li>Environmental score more constraining in Centre-North</li>
+          <li>Wind spatial lag stronger in South &amp; Islands (clustering)</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════════
+     SLIDE 13 — CONCLUSIONS
+════════════════════════════════════════════════════════════ -->
+<section>
+  <h2>Conclusions</h2>
+
+  <div class="concl">
+    <div class="icon">🗺</div>
+    <p><strong>Siting is predictable.</strong> ML models achieve AUC &gt; 0.78 (solar) and &gt; 0.89 (wind), confirming that location choices follow learnable spatial patterns driven by infrastructure access, topography, and land cover.</p>
+  </div>
+
+  <div class="concl">
+    <div class="icon">⚡</div>
+    <p><strong>Infrastructure is the dominant driver.</strong> Distance to transmission lines and substations consistently rank as top predictors — policy instruments that reduce grid connection costs could unlock new suitable areas.</p>
+  </div>
+
+  <div class="concl">
+    <div class="icon">🌍</div>
+    <p><strong>North–South divide persists.</strong> Regional heterogeneity analysis reveals that socioeconomic constraints (population density, poverty) operate differently across Italian macro-regions, with the South showing stronger wind clustering effects.</p>
+  </div>
+
+  <div class="concl">
+    <div class="icon">🌱</div>
+    <p><strong>Environmental-energy trade-offs are real.</strong> The environmental protection score consistently reduces siting probability, suggesting ongoing tension between Italy's conservation commitments and renewable expansion targets.</p>
+  </div>
+
+  <div class="concl">
+    <div class="icon">🔮</div>
+    <p><strong>Next steps:</strong> Integrate socioeconomic deprivation indices (ISTAT), project suitability under future land-use scenarios, and assess distributional equity of predicted high-suitability areas.</p>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════════
+     SLIDE 14 — THANK YOU
+════════════════════════════════════════════════════════════ -->
+<section class="title-slide">
+  <h1 style="font-size:1.4em;">Thank you</h1>
+  <h2>Questions &amp; Discussion</h2>
+  <div class="byline">
+    <p><strong>Alice Di Bella</strong></p>
+    <p>CMCC Foundation — Euro-Mediterranean Centre on Climate Change</p>
+    <p style="margin-top:0.8em; font-size:0.85em;">alice.dibella@cmcc.it</p>
+    <div style="margin-top:1.2em;">
+      <span class="tag">Code: github.com/cmcc/energySiting-Italy</span>
+      <span class="tag">Data: RSE Atlante · GWPT · Eurostat · ISPRA</span>
+    </div>
+  </div>
+</section>
+
+</div><!-- /slides -->
+</div><!-- /reveal -->
+
+<!-- Reveal.js scripts -->
+<script src="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/dist/reveal.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/plugin/notes/notes.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/plugin/highlight/highlight.js"></script>
+<script>
+  Reveal.initialize({
+    hash: true,
+    slideNumber: 'c/t',
+    progress: true,
+    controls: true,
+    controlsTutorial: true,
+    center: false,
+    transition: 'slide',
+    transitionSpeed: 'fast',
+    backgroundTransition: 'fade',
+    plugins: [ RevealNotes, RevealHighlight ],
+    // Keyboard shortcuts shown in notes
+    keyboard: {
+      70: function() { Reveal.toggleFullscreen(); }   // F = fullscreen
+    }
+  });
+</script>
+</body>
+</html>

@@ -59,7 +59,14 @@ ggsave("./fig/original/f1.png",
 
 
 ### f2
-# s_reg <- rst_s %>% 
+# Binary LULC dummies cause quasi-complete separation in logistic regression,
+# producing coefficients ~1e+07 that make the axis unreadable. These variables
+# are well-represented in the RF/GBM variable importance panels below, so they
+# are excluded here. The axis is auto-scaled from the remaining coefficients.
+lulc_sep_vars <- c("Forest", "Grassland", "Shrubland", "Riparian",
+                   "Vegetated", "Agriculture", "Developed", "Other lands")
+
+# s_reg <- rst_s %>%
 #   ggplot(aes(x = pe, y = reorder(var, pe))) +
 #   geom_vline(xintercept = 0,linetype = "dashed", size = 0.5, color = "gray30") +
 #   geom_errorbar(aes(xmin=pe-1.96*se, xmax=pe+1.96*se),color="gray50", width = 0.5) +
@@ -80,14 +87,14 @@ ggsave("./fig/original/f1.png",
 #         plot.title=element_text(family="Franklin Gothic Demi", size=16, hjust = -0.09)) 
 
 
-s_reg1 <- rst_s %>% 
+s_reg1 <- rst_s %>%
+  filter(!var %in% lulc_sep_vars) %>%
   mutate(Group = factor(Group),
-         color = factor(color, levels = c("Y","N"))) %>% 
+         color = factor(color, levels = c("Y","N"))) %>%
   ggplot(aes(x = pe, y = reorder(var, pe))) +
   geom_vline(xintercept = 0,linetype = "dashed", size = 0.5, color = "gray30") +
   geom_point(aes(fill = color),size = 2,pch=21) +
   theme_bw() +
-  
   labs(fill = "Significant", y = "", x = "Odds ratio (log scale)", title = "A") +
   scale_fill_manual(values=c("red", "gray")) +
   theme(panel.grid.minor = element_blank(),
@@ -98,18 +105,17 @@ s_reg1 <- rst_s %>%
         axis.text.x = element_text(color = "black",family="Franklin Gothic Book",size=6),
         axis.text.y = element_text(color = "black",family="Franklin Gothic Book",size=9),
         axis.title.x = element_text(color = "black",family="Franklin Gothic Book",size=11),
-        plot.title=element_text(family="Franklin Gothic Demi", size=16, hjust = -0.22)) 
+        plot.title=element_text(family="Franklin Gothic Demi", size=16, hjust = -0.22))
 
 
-s_reg2 <- rst_s %>% 
-  filter(Group == 5) %>% 
-  mutate(color = factor(color, levels = c("Y","N"))) %>% 
+s_reg2 <- rst_s %>%
+  filter(Group == 5, !var %in% lulc_sep_vars) %>%
+  mutate(color = factor(color, levels = c("Y","N"))) %>%
   ggplot(aes(x = pe, y = reorder(var,pe))) +
   geom_vline(xintercept = 0,linetype = "dashed", size = 0.5, color = "gray30") +
   geom_errorbar(aes(xmin=pe-1.96*se, xmax=pe+1.96*se),color="gray50", width = 0.5) +
   geom_point(aes(fill = color),size = 2,pch=21) +
   theme_bw() +
-  
   labs(fill = "Significant", y = "", x = "Odds ratio (log scale)", title = "") +
   scale_fill_manual(values=c("red", "gray")) +
   theme(panel.grid.minor = element_blank(),
@@ -120,7 +126,7 @@ s_reg2 <- rst_s %>%
         axis.text.x = element_text(color = "black",family="Franklin Gothic Book",size=6),
         axis.text.y = element_text(color = "black",family="Franklin Gothic Book",size=9),
         axis.title.x = element_text(color = "black",family="Franklin Gothic Book",size=11),
-        plot.title=element_text(family="Franklin Gothic Demi", size=16, hjust = -0.09)) 
+        plot.title=element_text(family="Franklin Gothic Demi", size=16, hjust = -0.09))
 
 
 # w_reg <- rst_w %>% 
@@ -145,14 +151,14 @@ s_reg2 <- rst_s %>%
 #         plot.title=element_text(family="Franklin Gothic Demi", size=16,  hjust = -0.09)) 
 
 
-w_reg1 <- rst_w %>% 
+w_reg1 <- rst_w %>%
+  filter(!var %in% lulc_sep_vars) %>%
   mutate(Group = factor(Group),
-         color = factor(color, levels = c("Y","N"))) %>% 
+         color = factor(color, levels = c("Y","N"))) %>%
   ggplot(aes(x = pe, y = reorder(var, pe))) +
   geom_vline(xintercept = 0,linetype = "dashed", size = 0.5, color = "gray30") +
   geom_point(aes(fill = color),size = 2,pch=21) +
   theme_bw() +
-  
   labs(fill = "Significant", y = "", x = "Odds ratio (log scale)", title = "B") +
   scale_fill_manual(values=c("red", "gray")) +
   theme(panel.grid.minor = element_blank(),
@@ -163,17 +169,16 @@ w_reg1 <- rst_w %>%
         axis.text.x = element_text(color = "black",family="Franklin Gothic Book",size=6),
         axis.text.y = element_text(color = "black",family="Franklin Gothic Book",size=9),
         axis.title.x = element_text(color = "black",family="Franklin Gothic Book",size=11),
-        plot.title=element_text(family="Franklin Gothic Demi", size=16, hjust = -0.22)) 
+        plot.title=element_text(family="Franklin Gothic Demi", size=16, hjust = -0.22))
 
-w_reg2 <- rst_w %>% 
-  filter(Group == 5) %>% 
-  mutate(color = factor(color, levels = c("Y","N"))) %>% 
+w_reg2 <- rst_w %>%
+  filter(Group == 5, !var %in% lulc_sep_vars) %>%
+  mutate(color = factor(color, levels = c("Y","N"))) %>%
   ggplot(aes(x = pe, y = reorder(var, pe))) +
   geom_vline(xintercept = 0,linetype = "dashed", size = 0.5, color = "gray30") +
   geom_errorbar(aes(xmin=pe-1.96*se, xmax=pe+1.96*se),color="gray50", width = 0.5) +
   geom_point(aes(fill = color),size = 2,pch=21) +
   theme_bw() +
-  
   labs(fill = "Significant", y = "", x = "Odds ratio (log scale)", title = "") +
   scale_fill_manual(values=c("red", "gray")) +
   theme(panel.grid.minor = element_blank(),
@@ -184,7 +189,7 @@ w_reg2 <- rst_w %>%
         axis.text.x = element_text(color = "black",family="Franklin Gothic Book",size=6),
         axis.text.y = element_text(color = "black",family="Franklin Gothic Book",size=9),
         axis.title.x = element_text(color = "black",family="Franklin Gothic Book",size=11),
-        plot.title=element_text(family="Franklin Gothic Demi", size=20)) 
+        plot.title=element_text(family="Franklin Gothic Demi", size=20))
 
 
 importance_s <- imp %>% 
@@ -363,8 +368,14 @@ grid.arrange(grobs = list(raster_grobs_labeled, barplot_grob, legend_grob), layo
 dev.off()
 
 ### f4
+# NUTS-2 geometries for choropleth maps (GLMM now uses 21 NUTS-2 regions)
+rgn2 <- giscoR::gisco_get_nuts(country = "IT", nuts_level = "2",
+                                year = "2021", resolution = "03") |>
+  st_transform(crs = 3035) |>
+  mutate(region = NAME_LATN)
+
 s_f4 <- s_d %>%
-  mutate(region = factor(region, levels = c("Nord-Ovest","Nord-Est","Centro","Sud","Isole"))) %>%
+  mutate(region = factor(region)) %>%
     ggplot(aes(x = R_effect, y = region, xmin=R_effect-SE, xmax=R_effect+SE)) +
     geom_vline(xintercept = 0,linetype = "dashed", size = 0.5, color = "gray30") +
     
@@ -388,7 +399,7 @@ s_f4 <- s_d %>%
   
 
 w_f4 <- w_d %>%
-  mutate(region = factor(region, levels = c("Nord-Ovest","Nord-Est","Centro","Sud","Isole"))) %>%
+  mutate(region = factor(region)) %>%
   ggplot(aes(x = R_effect, y = region, xmin=R_effect-SE, xmax=R_effect+SE)) +
   geom_vline(xintercept = 0,linetype = "dashed", size = 0.5, color = "gray30") +
   
@@ -412,7 +423,7 @@ w_f4 <- w_d %>%
 
 
 maps <- map(.x = c("Population density", "Transmission dist", "Environmental score"),
-            .f = function(x) rgn %>%
+            .f = function(x) rgn2 %>%
               left_join(s_d, by = "region") %>%
               filter(variable == x) %>%
 
@@ -436,7 +447,7 @@ s_f41 <- plot_grid(plotlist = maps, labels = "A", label_size = 14, label_fontfac
 
 
 maps <- map(.x = c("Capacity factor", "Spatial lag", "Transmission dist"),
-            .f = function(x) rgn %>%
+            .f = function(x) rgn2 %>%
               left_join(w_d, by = "region") %>%
               filter(variable == x) %>%
 

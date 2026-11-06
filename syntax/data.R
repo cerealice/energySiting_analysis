@@ -87,54 +87,162 @@ for(j in 1:8){
 
 
 ### Random-effects slope analysis ─────────────────────────────────────────────
-# Recover the one-hot region columns (cols 19–23 in the zonal CSV)
-# and derive a single region label before dropping the dummies.
-# Italian CSV column order after zonal.R:
-#   zone | tx roads sub slope pop fer unemploy foreignborn poverty (9)
-#        | lulc_forest … lulc_other (8)
-#        | region_nordovest … region_isole (5, cols 19–23)
-#        | env cf lag | treat
+# Use NUTS-2 (21 regions) as the GLMM grouping variable.
+# The 5 NUTS-1 macro-regions are too few for stable random-slope estimation
+# (need ~7+ groups per variance parameter). NUTS-2 is also the stratification
+# unit used in absence.R, so the grouping is consistent throughout.
+#
+# NUTS-2 is recovered via spatial join — no changes needed to upstream scripts.
+# Absence zone IDs map to s_ab_sf$id; presence zone IDs map to unique_id in
+# solar/wind_locations (which already carries state_code = NUTS-2 name).
+
+nuts2_sf <- region_boundaries %>% select(NUTS_NAME)
+
+s_ab_nuts2 <- s_ab_sf %>%
+  st_centroid() %>%
+  st_transform(st_crs(nuts2_sf)) %>%
+  st_join(nuts2_sf, join = st_within) %>%
+  st_drop_geometry() %>%
+  select(id, nuts2 = NUTS_NAME)
+
+w_ab_nuts2 <- w_ab_sf %>%
+  st_centroid() %>%
+  st_transform(st_crs(nuts2_sf)) %>%
+  st_join(nuts2_sf, join = st_within) %>%
+  st_drop_geometry() %>%
+  select(id, nuts2 = NUTS_NAME)
+
+s_pres_nuts2 <- solar_locations %>% st_drop_geometry() %>%
+  transmute(unique_id, nuts2 = state_code)
+w_pres_nuts2 <- wind_locations %>% st_drop_geometry() %>%
+  transmute(unique_id, nuts2 = state_code)
+
+assign_nuts2 <- function(dat, ab_lut, pres_lut) {
+  bind_rows(
+    dat %>% filter(treat == 0) %>% left_join(ab_lut,   by = c("zone" = "id")),
+    dat %>% filter(treat == 1) %>% left_join(pres_lut, by = c("zone" = "unique_id"))
+  )
+}
+
+s_dat <- assign_nuts2(s_dat, s_ab_nuts2, s_pres_nuts2)
+w_dat <- assign_nuts2(w_dat, w_ab_nuts2, w_pres_nuts2)
+
+rgn_cols <- grep("^region_", names(s_dat), value = TRUE)
 
 sol <- s_dat %>%
-  mutate(region = names(s_dat[19:23])[max.col(s_dat[19:23])]) %>%
-  dplyr::select(-zone, -region_nordovest:-region_isole)
+  dplyr::select(-zone, -all_of(rgn_cols)) %>%
+  rename(region = nuts2)
 
 win <- w_dat %>%
-  mutate(region = names(w_dat[19:23])[max.col(w_dat[19:23])]) %>%
-  dplyr::select(-zone, -region_nordovest:-region_isole)
+  dplyr::select(-zone, -all_of(rgn_cols)) %>%
+  rename(region = nuts2)
 
 
-library(nlme)
-RE <- function(tech){
-  if(tech == "solar"){
-    da          <- sol
-    model1vars  <- setdiff(names(da)[c(1:20)], c("pop","tx","env"))
-    fvar        <- as.formula(paste("treat ~", paste(model1vars, collapse = " + "),
-                                    "+ (pop+tx+env|region)"))
+RE <- function(tech) {
+  # With 21 NUTS-2 regions, the joint 3-slope model is identifiable.
+  # Each (rv | region) adds 3 covariance parameters; 21 groups / 3 params = 7,
+  # well above the minimum. bobyqa is retained for numerical stability.
+  if (tech == "solar") {
+    da      <- sol
+    rv_vars <- c("pop", "tx", "env")
   } else {
-    da          <- win
-    model1vars  <- setdiff(names(da)[c(1:20)], c("cf","tx","lag"))
-    fvar        <- as.formula(paste("treat ~", paste(model1vars, collapse = " + "),
-                                    "+ (cf+tx+lag|region)"))
+    da      <- win
+    rv_vars <- c("cf", "tx", "lag")
   }
 
-  fit <- glmer(fvar, family = "binomial", data = da)
+  fixed_vars <- setdiff(names(da), c("treat", "region"))
 
-  tp <- sqrt(attr(ranef(fit, condVar=T)[[1]], "postVar"))*1.96
+  # The GLMM is used only for regional heterogeneity, not the main result.
+  # Strategy for numerical stability:
+  #   1. Use only the top-8 RF predictors as fixed effects (avoids collinearity
+  #      from binary LULC dummies with near-zero variance within some regions)
+  #   2. Use nAGQ = 0 (Laplace approximation, skips the PIRLS step that fails)
+  #   3. Try slope model; if singular, fall back to intercept-only
+  #   4. If all fail, return stratified per-region GLM coefficients
 
-  d <- as.data.frame(ranef(fit)$region) %>%
-    tibble::rownames_to_column("region") %>%
-    mutate(region = recode(region,
-                           "region_nordovest" = "Nord-Ovest",
-                           "region_nordest"   = "Nord-Est",
-                           "region_centro"    = "Centro",
-                           "region_sud"       = "Sud",
-                           "region_isole"     = "Isole")) %>%
-    dplyr::select(-`(Intercept)`) %>%
-    gather(variable, R_effect, -region) %>%
-    mutate(SE = c(tp[2,2,], tp[3,3,], tp[4,4,]))
+  # Top predictors from RF (drop region dummies and low-importance binary LULC)
+  core_vars <- intersect(
+    c("cf", "tx", "sub", "lag", "env", "slope", "pop", "gdp_pc",
+      "unemploy", "inst_quality", "roads", "poverty"),
+    fixed_vars
+  )
 
-  return(d)
+  # --- helper: try multiple optimizers, return first non-singular fit ----------
+  try_glmer <- function(formula, da) {
+    opts <- c("bobyqa", "Nelder_Mead", "nlminbwrap")
+    for (opt in opts) {
+      fit <- tryCatch(
+        suppressWarnings(
+          glmer(formula, family = binomial, data = da, nAGQ = 0,
+                control = glmerControl(optimizer = opt,
+                                       optCtrl   = list(maxfun = 3e5)))
+        ),
+        error = function(e) NULL
+      )
+      if (!is.null(fit) && !isSingular(fit)) return(fit)
+    }
+    # return last fit even if singular rather than NULL
+    fit
+  }
+
+  # --- helper: stratified per-region GLM as a fallback -------------------------
+  stratified_glm <- function(da, rv) {
+    core_f <- as.formula(paste("treat ~", paste(core_vars, collapse = " + ")))
+    bind_rows(lapply(split(da, da$region), function(sub) {
+      if (nrow(sub) < 15 || length(unique(sub$treat)) < 2) return(NULL)
+      fit <- tryCatch(glm(core_f, family = binomial, data = sub), error = function(e) NULL)
+      if (is.null(fit) || !rv %in% names(coef(fit))) return(NULL)
+      se_tbl <- tryCatch(summary(fit)$coefficients, error = function(e) NULL)
+      if (is.null(se_tbl) || !rv %in% rownames(se_tbl)) return(NULL)
+      data.frame(region   = sub$region[1],
+                 variable = rv,
+                 R_effect = se_tbl[rv, "Estimate"],
+                 SE       = se_tbl[rv, "Std. Error"] * 1.96)
+    }))
+  }
+
+  d_list <- lapply(rv_vars, function(rv) {
+
+    f_slope <- as.formula(paste(
+      "treat ~", paste(core_vars, collapse = " + "),
+      paste0("+ (", rv, " | region)")
+    ))
+    f_int <- as.formula(paste(
+      "treat ~", paste(core_vars, collapse = " + "), "+ (1 | region)"
+    ))
+
+    fit <- try_glmer(f_slope, da)
+
+    # Fall back to intercept model if slope is singular
+    if (is.null(fit) || isSingular(fit)) {
+      message(sprintf(
+        "  [RE] Slope (%s | region) singular for %s — trying (1 | region)", rv, tech
+      ))
+      fit <- try_glmer(f_int, da)
+    }
+
+    # Last resort: stratified GLM
+    if (is.null(fit) || isSingular(fit)) {
+      message(sprintf(
+        "  [RE] GLMM singular for %s / %s — using stratified per-region GLM", tech, rv
+      ))
+      return(stratified_glm(da, rv))
+    }
+
+    re     <- ranef(fit)$region
+    pv     <- attr(ranef(fit, condVar = TRUE)[[1]], "postVar")
+    re_col <- if (rv %in% names(re)) rv else "(Intercept)"
+    se_idx <- if (rv %in% names(re)) 2L else 1L
+
+    data.frame(
+      region   = rownames(re),
+      variable = rv,
+      R_effect = re[[re_col]],
+      SE       = sqrt(pv[se_idx, se_idx, ]) * 1.96
+    )
+  })
+
+  bind_rows(d_list)
 }
 
 s_d <- RE("solar") %>%

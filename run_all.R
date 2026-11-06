@@ -54,6 +54,7 @@ run_setup <- function() {
   run_script("syntax/stack.R")                     # covStack.tif, solar/wind covStacks
 }
 
+#run_setup()
 
 # ── MAIN ANALYSIS PIPELINE ────────────────────────────────────────────────────
 # Run every time the presence data, covariates, or model code changes.
@@ -68,9 +69,11 @@ t_total <- proc.time()
 run_script("syntax/tech.R")      # presence locations (GSPT/GWPT + RSE Atlante)
 run_script("syntax/absence.R")   # pseudo-absence sampling
 run_script("syntax/zonal.R")     # covariate extraction
-run_script("syntax/modeling.R")  # GLM, Lasso, RF, GBM models  [slow ~30–60 min]
-run_script("syntax/data.R")      # regional summaries, GLMM
-run_script("syntax/plot.R")      # figures f1–f4
+run_script("syntax/modeling.R")     # GLM, Lasso, RF, GBM models  [slow ~30–60 min]
+run_script("syntax/performance.R")  # model comparison table + plots
+run_script("syntax/spatial_cv.R")   # spatial block CV  [slow ~30–60 min]
+run_script("syntax/data.R")         # regional summaries, GLMM
+run_script("syntax/plot.R")         # figures f1–f4
 
 elapsed_total <- round((proc.time() - t_total)[["elapsed"]])
 cat(sprintf("\n═══════════════════════════════════════════════════════════\n"))
