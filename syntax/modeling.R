@@ -31,22 +31,24 @@ var_labels <- c(
   "lulc_sparse"      = "Vegetated",
   "lulc_agriculture" = "Agriculture",
   "lulc_developed"   = "Developed",
-  "lulc_other"       = "Other lands",
+  # lulc_other omitted — reference class ("Other lands" baseline)
   "region_nordovest" = "Nord-Ovest",
   "region_nordest"   = "Nord-Est",
   "region_centro"    = "Centro",
   "region_sud"       = "Sud",
-  "region_isole"     = "Isole",
+  # region_isole omitted — reference class ("Isole" baseline)
   "env"              = "Environmental score",
   "cf"               = "Capacity factor",
   "lag"              = "Spatial lag"
 )
 
-# Shared model formula — defined here so drop_na() can reference it in both loops
+# Shared model formula — defined here so drop_na() can reference it in both loops.
+# lulc_other   omitted → reference land-cover class ("Other lands" baseline)
+# region_isole omitted → reference region dummy   ("Isole" baseline)
 region_model <- treat ~ tx + roads + sub + slope + pop + unemploy + foreignborn + poverty + gdp_pc + inst_quality +
   # fer +   # excluded — constant across Italy (GSE FER scheme is national)
-  lulc_forest + lulc_grassland + lulc_shrubland + lulc_riparian + lulc_sparse + lulc_agriculture + lulc_developed + lulc_other +
-  region_nordovest + region_nordest + region_centro + region_sud + region_isole +
+  lulc_forest + lulc_grassland + lulc_shrubland + lulc_riparian + lulc_sparse + lulc_agriculture + lulc_developed +
+  region_nordovest + region_nordest + region_centro + region_sud +
   env + cf + lag
 
 
@@ -70,12 +72,7 @@ for(i in 1:10){
                  i, paste(sprintf("  %-25s %d", names(na_cols), na_cols), collapse = "\n")))
   }
 
-  glm1_solar <- glm(treat ~ tx + roads + sub + slope + pop + unemploy + foreignborn + poverty + gdp_pc + inst_quality +
-                      # fer +   # excluded — constant across Italy
-                      lulc_forest + lulc_grassland + lulc_shrubland + lulc_riparian + lulc_sparse + lulc_agriculture + lulc_developed + lulc_other +
-                      region_nordovest + region_nordest + region_centro + region_sud + region_isole +
-                      env + cf + lag,
-                    data=s_dat, family = binomial(link="logit"))
+  glm1_solar <- glm(region_model, data = s_dat, family = binomial(link = "logit"))
 
   tp <- summary(glm1_solar)$coefficients %>%
     as.data.frame() %>%
@@ -106,12 +103,7 @@ s_dat <- solar.cov.bg %>%
 write.csv(s_dat, "./derived/solar.csv", row.names = FALSE)
 
 
-glm1_solar <- glm(treat ~ tx + roads + sub + slope + pop + unemploy + foreignborn + poverty + gdp_pc + inst_quality +
-                    # fer +   # excluded — constant across Italy
-                    lulc_forest + lulc_grassland + lulc_shrubland + lulc_riparian + lulc_sparse + lulc_agriculture + lulc_developed + lulc_other +
-                    region_nordovest + region_nordest + region_centro + region_sud + region_isole +
-                    env + cf + lag,
-                  data=s_dat, family = binomial(link="logit"))
+glm1_solar <- glm(region_model, data = s_dat, family = binomial(link = "logit"))
 
 
 solar.pg <- predict(object = solar_future, model = glm1_solar, type = "response", ext=extent(solar_future))
@@ -217,12 +209,7 @@ for(i in 1:10){
                  i, paste(sprintf("  %-25s %d", names(na_cols), na_cols), collapse = "\n")))
   }
 
-  glm1_wind <- glm(treat ~ tx + roads + sub + slope + pop + unemploy + foreignborn + poverty + gdp_pc + inst_quality +
-                      # fer +   # excluded — constant across Italy
-                      lulc_forest + lulc_grassland + lulc_shrubland + lulc_riparian + lulc_sparse + lulc_agriculture + lulc_developed + lulc_other +
-                      region_nordovest + region_nordest + region_centro + region_sud + region_isole +
-                      env + cf + lag,
-                    data=w_dat, family = binomial(link="logit"))
+  glm1_wind <- glm(region_model, data = w_dat, family = binomial(link = "logit"))
 
   tp <- summary(glm1_wind)$coefficients %>%
     as.data.frame() %>%
@@ -253,12 +240,7 @@ w_dat <- wind.cov.bg %>%
 write.csv(w_dat, "./derived/wind.csv", row.names = FALSE)
 
 
-glm1_wind <- glm(treat ~ tx + roads + sub + slope + pop + unemploy + foreignborn + poverty + gdp_pc + inst_quality +
-                    # fer +   # excluded — constant across Italy
-                    lulc_forest + lulc_grassland + lulc_shrubland + lulc_riparian + lulc_sparse + lulc_agriculture + lulc_developed + lulc_other +
-                    region_nordovest + region_nordest + region_centro + region_sud + region_isole +
-                    env + cf + lag,
-                  data=w_dat, family = binomial(link="logit"))
+glm1_wind <- glm(region_model, data = w_dat, family = binomial(link = "logit"))
 
 
 wind.pg <- predict(object = wind_future, model = glm1_wind, type = "response", ext=extent(wind_future))

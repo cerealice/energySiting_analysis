@@ -1,12 +1,14 @@
 source("./syntax/function.R")
 librarian::shelf("blockCV")
 
-# ── Shared model formula (same as modeling.R) ─────────────────────────────────
+# ── Shared model formula (must match modeling.R exactly) ─────────────────────
+# lulc_other = reference land-cover class (omitted → "Other lands" baseline)
+# region_isole = reference region dummy  (omitted → "Isole" baseline)
 region_model <- treat ~ tx + roads + sub + slope + pop + unemploy + foreignborn +
   poverty + gdp_pc + inst_quality +
   lulc_forest + lulc_grassland + lulc_shrubland + lulc_riparian + lulc_sparse +
-  lulc_agriculture + lulc_developed + lulc_other +
-  region_nordovest + region_nordest + region_centro + region_sud + region_isole +
+  lulc_agriculture + lulc_developed +
+  region_nordovest + region_nordest + region_centro + region_sud +
   env + cf + lag
 
 
@@ -38,15 +40,24 @@ get_absence_xy <- function(ab_sf) {
 absence_xy_s <- get_absence_xy(s_ab_sf)
 absence_xy_w <- get_absence_xy(w_ab_sf)
 
-coords_s <- bind_rows(presence_xy_s, absence_xy_s)
-coords_w <- bind_rows(presence_xy_w, absence_xy_w)
-
 
 # ── 2. Attach coordinates to training data and convert to sf ──────────────────
+# Presence zone IDs (raster cell values, 1…N_plants) overlap with absence
+# polygon IDs (ab_sf$id, also starting at 1).  Tag each lookup table with the
+# treat value so the join key is (zone, treat) — unique by construction.
+
+coords_s <- bind_rows(
+  mutate(presence_xy_s, treat = "X1"),
+  mutate(absence_xy_s,  treat = "X0")
+)
+coords_w <- bind_rows(
+  mutate(presence_xy_w, treat = "X1"),
+  mutate(absence_xy_w,  treat = "X0")
+)
 
 attach_coords <- function(dat_csv, coords) {
   dat_csv %>%
-    left_join(coords, by = "zone") %>%
+    left_join(coords, by = c("zone", "treat")) %>%
     filter(!is.na(x), !is.na(y)) %>%
     mutate(treat = factor(make.names(treat))) %>%
     sf::st_as_sf(coords = c("x", "y"), crs = 3035, remove = FALSE)

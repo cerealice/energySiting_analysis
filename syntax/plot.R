@@ -378,10 +378,10 @@ s_f4 <- s_d %>%
   mutate(region = factor(region)) %>%
     ggplot(aes(x = R_effect, y = region, xmin=R_effect-SE, xmax=R_effect+SE)) +
     geom_vline(xintercept = 0,linetype = "dashed", size = 0.5, color = "gray30") +
-    
+
     geom_pointrangeh(position = position_dodge2v(height = 0.4), color = "gray10", fatten = 2, size = 0.7) +
-    
-    facet_wrap(~variable, scales = "free_x") +
+
+    facet_wrap(~panel_label, scales = "free_x") +
     theme_bw() +
     
     labs(x = "Odds ratio (log scale)", y ="", color = "",
@@ -402,10 +402,10 @@ w_f4 <- w_d %>%
   mutate(region = factor(region)) %>%
   ggplot(aes(x = R_effect, y = region, xmin=R_effect-SE, xmax=R_effect+SE)) +
   geom_vline(xintercept = 0,linetype = "dashed", size = 0.5, color = "gray30") +
-  
+
   geom_pointrangeh(position = position_dodge2v(height = 0.4), color = "gray10", fatten = 2, size = 0.7) +
-  
-  facet_wrap(~variable, scales = "free_x") +
+
+  facet_wrap(~panel_label, scales = "free_x") +
   theme_bw() +
   
   labs(x = "Odds ratio (log scale)", y ="", color = "",
@@ -422,50 +422,66 @@ w_f4 <- w_d %>%
         plot.title=element_text(family="Franklin Gothic Demi", size=20))
 
 
-maps <- map(.x = c("Population density", "Transmission dist", "Environmental score"),
-            .f = function(x) rgn2 %>%
+s_panel_labels <- s_d %>%
+  distinct(variable, panel_label) %>%
+  arrange(variable) %>%
+  pull(panel_label)
+
+maps <- map(.x = s_panel_labels,
+            .f = function(x) {
+              var_name <- s_d$variable[s_d$panel_label == x][1]
+              rgn2 %>%
               left_join(s_d, by = "region") %>%
-              filter(variable == x) %>%
+              filter(panel_label == x) %>%
 
               ggplot() +
               geom_sf(fill = "white", color = "gray0") +
               geom_sf(aes(fill = R_effect), size = 0.3) +
 
               theme_minimal() +
-              scale_fill_gradient2(low = if (x %in% c("Transmission dist", "Environmental score")) "darkorange3" else "royalblue3",
-                                   mid = "white",
-                                   high = if (x %in% c("Transmission dist", "Environmental score")) "royalblue3" else "darkorange3",
-                                   midpoint = 0) +
+              scale_fill_gradient2(
+                low      = if (var_name %in% c("Transmission dist", "Environmental score")) "darkorange3" else "royalblue3",
+                mid      = "white",
+                high     = if (var_name %in% c("Transmission dist", "Environmental score")) "royalblue3" else "darkorange3",
+                midpoint = 0) +
 
               labs(title = x, fill = "") +
               coord_sf(crs = st_crs(3035), datum = NA) +
               theme(legend.position = "right",
                     plot.title = element_text(hjust = 0.5))
-)
+})
 
 s_f41 <- plot_grid(plotlist = maps, labels = "A", label_size = 14, label_fontface = "plain", nrow = 1, hjust = -0.2)
 
 
-maps <- map(.x = c("Capacity factor", "Spatial lag", "Transmission dist"),
-            .f = function(x) rgn2 %>%
+w_panel_labels <- w_d %>%
+  distinct(variable, panel_label) %>%
+  arrange(variable) %>%
+  pull(panel_label)
+
+maps <- map(.x = w_panel_labels,
+            .f = function(x) {
+              var_name <- w_d$variable[w_d$panel_label == x][1]
+              rgn2 %>%
               left_join(w_d, by = "region") %>%
-              filter(variable == x) %>%
+              filter(panel_label == x) %>%
 
               ggplot() +
               geom_sf(fill = "white", color = "gray0") +
               geom_sf(aes(fill = R_effect), size = 0.3) +
 
               theme_minimal() +
-              scale_fill_gradient2(low = if (x %in% c("Transmission dist", "Environmental score")) "darkorange3" else "royalblue3",
-                                   mid = "white",
-                                   high = if (x %in% c("Transmission dist", "Environmental score")) "royalblue3" else "darkorange3",
-                                   midpoint = 0) +
+              scale_fill_gradient2(
+                low      = if (var_name %in% c("Transmission dist", "Environmental score")) "darkorange3" else "royalblue3",
+                mid      = "white",
+                high     = if (var_name %in% c("Transmission dist", "Environmental score")) "royalblue3" else "darkorange3",
+                midpoint = 0) +
 
               labs(title = x, fill = "") +
               coord_sf(crs = st_crs(3035), datum = NA) +
               theme(legend.position = "right",
                     plot.title = element_text(hjust = 0.5))
-)
+})
 
 w_f41 <- plot_grid(plotlist = maps, labels = "B", label_size = 14, label_fontface = "plain", nrow = 1, hjust = -0.2)
 
