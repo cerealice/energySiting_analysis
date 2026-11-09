@@ -490,10 +490,7 @@ pre.fix .add { color: var(--m-rf); }
             80% of wind presences are comune centroids from RSE<small>Covariates
             describe the comune centre, not the plant footprint. Comuni with
             several plants count once.</small></span></li>
-          <li><span class="n">Resource</span><span class="d">Capacity factors are
-            WorldClim proxies (<code>srad</code>, <code>wind</code>)<small>PVGIS for
-            solar and ERA5 for wind are pending; capacity factor ranks only 9th
-            (solar) and 10th (wind) by tree importance.</small></span></li>
+          <li><span class="n">Resource</span><span class="d">ERA5 climate (25 variables, 2000&ndash;2020 means), LUH3 land-use fractions (12 variables, 2020), and MODIS NDVI (2003&ndash;2020 mean) now in predictor stack via WorldTensor. WorldClim BIO1&ndash;19 also added.<small>PVGIS capacity factors for solar still pending. Capacity factor was 9th/10th by tree importance with proxies.</small></span></li>
           <li><span class="n">Policy</span><span class="d">The FER incentive
             variable is constant across Italy and is dropped<small>The US
             model's RPS term has no Italian counterpart until GSE zone polygons
@@ -529,9 +526,11 @@ pre.fix .add { color: var(--m-rf); }
           <li><span class="n done">data.R ✓</span><span class="d">Wind joint
             3-slope GLMM converged; solar env intercept-only labelled in figure
             4.<small><code>panel_label</code> propagates to map titles too.</small></span></li>
-          <li><span class="n warn">Inputs</span><span class="d">PVGIS and ERA5 capacity
-            factors, GSE incentive zones, then <code>run_setup()</code>
-            and <code>run_all.R</code></span></li>
+          <li><span class="n done">WorldTensor &#10003;</span><span class="d">534 ERA5/LUH3/NDVI .nc files downloaded from Zenodo ZIPs via HTTP range extraction (<code>remotezip</code>).<small>Previous script tried direct .nc URLs &mdash; all 404. Files live in ZIP archives. ERA5 25 vars 2000&ndash;2020 means, LUH3 12 land-use fractions 2020 (NA&rarr;0 = land type absent), NDVI 2003&ndash;2020 mean.</small></span></li>
+          <li><span class="n done">WorldClim &#10003;</span><span class="d">BIO1&ndash;19 bioclimatic variables downloaded and snapped to 1 km Italy grid.<small>Previously only <code>srad</code> and <code>wind</code> proxies; now full BIO stack. 24 TIFs (220&ndash;250 MB each) accidentally committed to git history &mdash; removed with <code>git filter-repo</code> and force-pushed.</small></span></li>
+          <li><span class="n done">modeling.R NA fix &#10003;</span><span class="d"><code>luh3_c4per</code> is all-NA in Italy (C4 perennial crops simply absent); <code>na.omit()</code> was dropping every row.<small><code>impute_dat()</code> now replaces LUH3 NAs with 0 and other numeric NAs with column median. Scientifically defensible: 0 fraction = land type not present, not missing data.</small></span></li>
+          <li><span class="n done">Figure 2 filter &#10003;</span><span class="d">Only significant predictors (p &lt; 0.05) now shown in coefficient plot.<small>Was showing all 90+ predictors, unreadable. Filter: <code>color == &ldquo;Y&rdquo;</code> in <code>rst_s</code> and <code>rst_w</code>.</small></span></li>
+          <li><span class="n warn">Inputs</span><span class="d">PVGIS capacity factors and GSE incentive zones still pending; then rerun <code>run_setup()</code> and <code>run_all.R</code>.</span></li>
           <li><span class="n warn">Checks</span><span class="d">Precision / recall /
             F1 by threshold, area of applicability (CAST), calibration curves,
             GEM-only temporal hold-out</span></li>
