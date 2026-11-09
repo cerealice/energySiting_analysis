@@ -88,7 +88,7 @@ lulc_sep_vars <- c("Forest", "Grassland", "Shrubland", "Riparian",
 
 
 s_reg1 <- rst_s %>%
-  filter(!var %in% lulc_sep_vars) %>%
+  filter(!var %in% lulc_sep_vars, color == "Y") %>%
   mutate(Group = factor(Group),
          color = factor(color, levels = c("Y","N"))) %>%
   ggplot(aes(x = pe, y = reorder(var, pe))) +
@@ -109,7 +109,7 @@ s_reg1 <- rst_s %>%
 
 
 s_reg2 <- rst_s %>%
-  filter(Group == 5, !var %in% lulc_sep_vars) %>%
+  filter(Group == 5, !var %in% lulc_sep_vars, color == "Y") %>%
   mutate(color = factor(color, levels = c("Y","N"))) %>%
   ggplot(aes(x = pe, y = reorder(var,pe))) +
   geom_vline(xintercept = 0,linetype = "dashed", size = 0.5, color = "gray30") +
@@ -152,7 +152,7 @@ s_reg2 <- rst_s %>%
 
 
 w_reg1 <- rst_w %>%
-  filter(!var %in% lulc_sep_vars) %>%
+  filter(!var %in% lulc_sep_vars, color == "Y") %>%
   mutate(Group = factor(Group),
          color = factor(color, levels = c("Y","N"))) %>%
   ggplot(aes(x = pe, y = reorder(var, pe))) +
@@ -172,7 +172,7 @@ w_reg1 <- rst_w %>%
         plot.title=element_text(family="Franklin Gothic Demi", size=16, hjust = -0.22))
 
 w_reg2 <- rst_w %>%
-  filter(Group == 5, !var %in% lulc_sep_vars) %>%
+  filter(Group == 5, !var %in% lulc_sep_vars, color == "Y") %>%
   mutate(color = factor(color, levels = c("Y","N"))) %>%
   ggplot(aes(x = pe, y = reorder(var, pe))) +
   geom_vline(xintercept = 0,linetype = "dashed", size = 0.5, color = "gray30") +

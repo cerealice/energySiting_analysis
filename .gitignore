@@ -30,3 +30,5 @@ data/raw_downloads/*.qmd
 data/raw_downloads/eea_v_3035*/
 data/raw_downloads/wc2*/
 data/raw_downloads/srtm*/
+data/raw_downloads/worldtensor/
+data/raw_downloads/worldclim/

@@ -12,45 +12,165 @@ solar.cov.bg <- s.bg %>%
 # Using rownames_to_column() + recode() avoids hard-coded positional matching,
 # so dropped variables (rank-deficient columns) don't misalign the labels.
 var_labels <- c(
-  "(Intercept)"      = "(Intercept)",
-  "tx"               = "Transmission dist",
-  "roads"            = "Road dist",
-  "sub"              = "Substation dist",
-  "slope"            = "Slope",
-  "pop"              = "Population density",
-  # "fer"            = "FER incentive",   # excluded — constant across Italy
-  "unemploy"         = "Unemployment",
-  "foreignborn"      = "Foreign born",
-  "poverty"          = "Poverty",
-  "gdp_pc"           = "GDP per capita",
-  "inst_quality"     = "Institutional quality",
-  "lulc_forest"      = "Forest",
-  "lulc_grassland"   = "Grassland",
-  "lulc_shrubland"   = "Shrubland",
-  "lulc_riparian"    = "Riparian",
-  "lulc_sparse"      = "Vegetated",
-  "lulc_agriculture" = "Agriculture",
-  "lulc_developed"   = "Developed",
-  # lulc_other omitted — reference class ("Other lands" baseline)
-  "region_nordovest" = "Nord-Ovest",
-  "region_nordest"   = "Nord-Est",
-  "region_centro"    = "Centro",
-  "region_sud"       = "Sud",
-  # region_isole omitted — reference class ("Isole" baseline)
-  "env"              = "Environmental score",
-  "cf"               = "Capacity factor",
-  "lag"              = "Spatial lag"
+  "(Intercept)"        = "(Intercept)",
+  # Infrastructure
+  "tx"                 = "Transmission dist",
+  "roads"              = "Road dist",
+  "sub"                = "Substation dist",
+  "slope"              = "Slope",
+  "pop"                = "Population density",
+  # Socioeconomic
+  "unemploy"           = "Unemployment",
+  "foreignborn"        = "Foreign born",
+  "poverty"            = "Poverty",
+  "gdp_pc"             = "GDP per capita",
+  "inst_quality"       = "Institutional quality",
+  # WorldClim BIO
+  "wclim_bio01"        = "Annual mean temp (WC)",
+  "wclim_bio02"        = "Diurnal temp range (WC)",
+  "wclim_bio03"        = "Isothermality (WC)",
+  "wclim_bio04"        = "Temp seasonality (WC)",
+  "wclim_bio05"        = "Max temp warmest (WC)",
+  "wclim_bio06"        = "Min temp coldest (WC)",
+  "wclim_bio07"        = "Annual temp range (WC)",
+  "wclim_bio08"        = "Temp wettest qtr (WC)",
+  "wclim_bio09"        = "Temp driest qtr (WC)",
+  "wclim_bio10"        = "Temp warmest qtr (WC)",
+  "wclim_bio11"        = "Temp coldest qtr (WC)",
+  "wclim_bio12"        = "Annual precip (WC)",
+  "wclim_bio13"        = "Precip wettest mo (WC)",
+  "wclim_bio14"        = "Precip driest mo (WC)",
+  "wclim_bio15"        = "Precip seasonality (WC)",
+  "wclim_bio16"        = "Precip wettest qtr (WC)",
+  "wclim_bio17"        = "Precip driest qtr (WC)",
+  "wclim_bio18"        = "Precip warmest qtr (WC)",
+  "wclim_bio19"        = "Precip coldest qtr (WC)",
+  # ERA5 climate
+  "era5_t2m_mean"      = "Temperature mean (ERA5)",
+  "era5_t2m_max"       = "Temperature max (ERA5)",
+  "era5_t2m_min"       = "Temperature min (ERA5)",
+  "era5_t2m_std"       = "Temperature SD (ERA5)",
+  "era5_d2m_mean"      = "Dewpoint temp (ERA5)",
+  "era5_tp_sum"        = "Precipitation (ERA5)",
+  "era5_cp_sum"        = "Convective precip (ERA5)",
+  "era5_sf_sum"        = "Snowfall (ERA5)",
+  "era5_e_sum"         = "Evaporation (ERA5)",
+  "era5_pev_sum"       = "Potential evap (ERA5)",
+  "era5_ro_sum"        = "Runoff (ERA5)",
+  "era5_u10_mean"      = "Wind U 10m (ERA5)",
+  "era5_v10_mean"      = "Wind V 10m (ERA5)",
+  "era5_u100_mean"     = "Wind U 100m (ERA5)",
+  "era5_v100_mean"     = "Wind V 100m (ERA5)",
+  "era5_i10fg_mean"    = "Wind gust (ERA5)",
+  "era5_ssrd_sum"      = "Solar radiation (ERA5)",
+  "era5_ssr_sum"       = "Net solar rad (ERA5)",
+  "era5_cdir_sum"      = "Clear-sky direct solar (ERA5)",
+  "era5_ssrdc_sum"     = "Clear-sky solar down (ERA5)",
+  "era5_tcc_mean"      = "Cloud cover (ERA5)",
+  "era5_blh_mean"      = "Boundary layer H (ERA5)",
+  "era5_sp_mean"       = "Surface pressure (ERA5)",
+  "era5_cape_mean"     = "CAPE (ERA5)",
+  # LUH3 land use
+  "luh3_primf"         = "Primary forest (LUH3)",
+  "luh3_primn"         = "Primary non-forest (LUH3)",
+  "luh3_secdf"         = "Secondary forest (LUH3)",
+  "luh3_secdn"         = "Secondary non-forest (LUH3)",
+  "luh3_pastr"         = "Pasture (LUH3)",
+  "luh3_range"         = "Rangeland (LUH3)",
+  "luh3_urban"         = "Urban (LUH3)",
+  "luh3_c3ann"         = "C3 annual crops (LUH3)",
+  "luh3_c4ann"         = "C4 annual crops (LUH3)",
+  "luh3_c3per"         = "C3 perennial crops (LUH3)",
+  "luh3_c4per"         = "C4 perennial crops (LUH3)",
+  "luh3_c3nfx"         = "N-fixing crops (LUH3)",
+  # NDVI
+  "wt_ndvi_mean"       = "NDVI (MODIS)",
+  # CORINE LULC
+  "lulc_forest"        = "Forest",
+  "lulc_grassland"     = "Grassland",
+  "lulc_shrubland"     = "Shrubland",
+  "lulc_riparian"      = "Riparian",
+  "lulc_sparse"        = "Vegetated",
+  "lulc_agriculture"   = "Agriculture",
+  "lulc_developed"     = "Developed",
+  # lulc_other omitted — reference class
+  # NUTS-2 regions (reference = nuts2_itg2 / Sardegna)
+  "nuts2_itc1"         = "Piemonte",
+  "nuts2_itc2"         = "Valle d'Aosta",
+  "nuts2_itc3"         = "Liguria",
+  "nuts2_itc4"         = "Lombardia",
+  "nuts2_ith1"         = "PA Bolzano",
+  "nuts2_ith2"         = "PA Trento",
+  "nuts2_ith3"         = "Veneto",
+  "nuts2_ith4"         = "Friuli-VG",
+  "nuts2_ith5"         = "Emilia-Romagna",
+  "nuts2_iti1"         = "Toscana",
+  "nuts2_iti2"         = "Umbria",
+  "nuts2_iti3"         = "Marche",
+  "nuts2_iti4"         = "Lazio",
+  "nuts2_itf1"         = "Abruzzo",
+  "nuts2_itf2"         = "Molise",
+  "nuts2_itf3"         = "Campania",
+  "nuts2_itf4"         = "Puglia",
+  "nuts2_itf5"         = "Basilicata",
+  "nuts2_itf6"         = "Calabria",
+  "nuts2_itg1"         = "Sicilia",
+  # nuts2_itg2 omitted — reference class (Sardegna)
+  "env"                = "Environmental score",
+  "cf"                 = "Capacity factor",
+  "lag"                = "Spatial lag"
 )
 
-# Shared model formula — defined here so drop_na() can reference it in both loops.
-# lulc_other   omitted → reference land-cover class ("Other lands" baseline)
-# region_isole omitted → reference region dummy   ("Isole" baseline)
-region_model <- treat ~ tx + roads + sub + slope + pop + unemploy + foreignborn + poverty + gdp_pc + inst_quality +
-  # fer +   # excluded — constant across Italy (GSE FER scheme is national)
-  lulc_forest + lulc_grassland + lulc_shrubland + lulc_riparian + lulc_sparse + lulc_agriculture + lulc_developed +
-  region_nordovest + region_nordest + region_centro + region_sud +
+# region_model is defined once in function.R (sourced above).
+# Redefined here only to keep the collinearity note visible alongside the models.
+# NOTE: ~90 predictors total. GLM/LASSO may have collinearity warnings — this is
+# expected with highly correlated climate variables. GBM, RF, and NN are unaffected.
+region_model <- treat ~
+  # Infrastructure & demographics
+  tx + roads + sub + slope + pop +
+  # Socioeconomic
+  unemploy + foreignborn + poverty + gdp_pc + inst_quality +
+  # WorldClim BIO1-BIO19
+  wclim_bio01 + wclim_bio02 + wclim_bio03 + wclim_bio04 + wclim_bio05 +
+  wclim_bio06 + wclim_bio07 + wclim_bio08 + wclim_bio09 + wclim_bio10 +
+  wclim_bio11 + wclim_bio12 + wclim_bio13 + wclim_bio14 + wclim_bio15 +
+  wclim_bio16 + wclim_bio17 + wclim_bio18 + wclim_bio19 +
+  # ERA5 climate (annual means 2000-2020)
+  era5_t2m_mean + era5_t2m_max + era5_t2m_min + era5_t2m_std +
+  era5_d2m_mean +
+  era5_tp_sum + era5_cp_sum + era5_sf_sum +
+  era5_e_sum + era5_pev_sum + era5_ro_sum +
+  era5_u10_mean + era5_v10_mean + era5_u100_mean + era5_v100_mean + era5_i10fg_mean +
+  era5_ssrd_sum + era5_ssr_sum + era5_cdir_sum + era5_ssrdc_sum +
+  era5_tcc_mean + era5_blh_mean + era5_sp_mean + era5_cape_mean +
+  # LUH3 land-use states 2020
+  luh3_primf + luh3_primn + luh3_secdf + luh3_secdn +
+  luh3_pastr + luh3_range + luh3_urban +
+  luh3_c3ann + luh3_c4ann + luh3_c3per + luh3_c4per + luh3_c3nfx +
+  # MODIS NDVI
+  wt_ndvi_mean +
+  # CORINE land cover (lulc_other omitted — reference)
+  lulc_forest + lulc_grassland + lulc_shrubland + lulc_riparian +
+  lulc_sparse + lulc_agriculture + lulc_developed +
+  # NUTS-2 regions (nuts2_itg2 omitted — reference: Sardegna)
+  nuts2_itc1 + nuts2_itc2 + nuts2_itc3 + nuts2_itc4 +
+  nuts2_ith1 + nuts2_ith2 + nuts2_ith3 + nuts2_ith4 + nuts2_ith5 +
+  nuts2_iti1 + nuts2_iti2 + nuts2_iti3 + nuts2_iti4 +
+  nuts2_itf1 + nuts2_itf2 + nuts2_itf3 + nuts2_itf4 + nuts2_itf5 + nuts2_itf6 +
+  nuts2_itg1 +
+  # Technology-specific
   env + cf + lag
 
+
+# ── NA imputation ─────────────────────────────────────────────────────────────
+# LUH3 land-use fractions: NA from raster masking means no coverage → 0
+# (a fraction of 0 is scientifically valid; NaN in LUH3 for Italy = absent type)
+# All other numerics: edge-cell NAs from WorldClim/ERA5 downscaling → column median
+impute_dat <- function(df) {
+  df %>%
+    mutate(across(starts_with("luh3_"), ~replace_na(., 0))) %>%
+    mutate(across(where(is.numeric), ~replace_na(., median(., na.rm = TRUE))))
+}
 
 ### combined
 rst_s <- data.frame()
@@ -61,7 +181,7 @@ for(i in 1:10){
     dplyr::select(-group) %>%
     rbind(solar.cov.existing) %>%
     mutate(treat = factor(treat)) %>%
-    tidyr::drop_na(all_of(all.vars(region_model))) %>%
+    impute_dat() %>%
     mutate(treat = factor(make.names(treat)))
 
   if (nrow(s_dat) == 0 || length(levels(s_dat$treat)) < 2) {
@@ -97,7 +217,7 @@ s_dat <- solar.cov.bg %>%
   dplyr::select(-group) %>%
   rbind(solar.cov.existing) %>%
   mutate(treat = factor(treat)) %>%
-  na.omit() %>%
+  impute_dat() %>%
   mutate(treat = factor(make.names(treat)))   # "0"/"1" → "X0"/"X1" (valid R names for caret)
 
 write.csv(s_dat, "./derived/solar.csv", row.names = FALSE)
@@ -170,12 +290,32 @@ solar.pg.rf <- predict(object = solar_future, mdl_solarrf, type = "prob", ext=ex
 writeRaster(solar.pg.rf, "./derived/pred_randomForest_s.tif", overwrite=TRUE)
 
 
+#### Neural network
+librarian::shelf("nnet")
+tune_nn <- expand.grid(size = c(5, 10, 20), decay = c(0.001, 0.01, 0.1))
+
+mdl_solarnn <- train(form = region_model, data = s_dat,
+                     method = "nnet",
+                     trControl = tc_kfold,
+                     tuneGrid = tune_nn,
+                     preProcess = c("center", "scale"),
+                     na.action = na.omit,
+                     MaxNWts = 5000,
+                     trace = FALSE)
+
+varimp_solarnn <- varImp(mdl_solarnn)
+solar.pg.nn <- predict(object = solar_future, mdl_solarnn, type = "prob",
+                       ext = extent(solar_future), progress = 'text', index = 2)
+writeRaster(solar.pg.nn, "./derived/pred_nn_s.tif", overwrite = TRUE)
+
+
 ### summary
 solarmodel_list <- list(
-  glm = mdl_solarglm,
+  glm   = mdl_solarglm,
   lasso = mdl_solarlasso,
-  xg = mdl_solarxg,
-  rf = mdl_solarrf
+  xg    = mdl_solarxg,
+  rf    = mdl_solarrf,
+  nn    = mdl_solarnn
 )
 
 solar_resamps <- resamples(solarmodel_list)
@@ -198,7 +338,7 @@ for(i in 1:10){
     dplyr::select(-group) %>%
     rbind(wind.cov.existing) %>%
     mutate(treat = factor(treat)) %>%
-    tidyr::drop_na(all_of(all.vars(region_model))) %>%
+    impute_dat() %>%
     mutate(treat = factor(make.names(treat)))
 
   if (nrow(w_dat) == 0 || length(levels(w_dat$treat)) < 2) {
@@ -234,7 +374,7 @@ w_dat <- wind.cov.bg %>%
   dplyr::select(-group) %>%
   rbind(wind.cov.existing) %>%
   mutate(treat = factor(treat)) %>%
-  na.omit() %>%
+  impute_dat() %>%
   mutate(treat = factor(make.names(treat)))   # "0"/"1" → "X0"/"X1"
 
 write.csv(w_dat, "./derived/wind.csv", row.names = FALSE)
@@ -300,12 +440,29 @@ wind.pg.rf <- predict(object = wind_future, mdl_windrf, type = "prob", ext=exten
 writeRaster(wind.pg.rf, "./derived/pred_randomForest_w.tif", overwrite=TRUE)
 
 
+#### Neural network
+mdl_windnn <- train(form = region_model, data = w_dat,
+                    method = "nnet",
+                    trControl = tc_kfold,
+                    tuneGrid = tune_nn,
+                    preProcess = c("center", "scale"),
+                    na.action = na.omit,
+                    MaxNWts = 5000,
+                    trace = FALSE)
+
+varimp_windnn <- varImp(mdl_windnn)
+wind.pg.nn <- predict(object = wind_future, mdl_windnn, type = "prob",
+                      ext = extent(wind_future), progress = 'text', index = 2)
+writeRaster(wind.pg.nn, "./derived/pred_nn_w.tif", overwrite = TRUE)
+
+
 ### summary
 windmodel_list <- list(
-  glm = mdl_windglm,
+  glm   = mdl_windglm,
   lasso = mdl_windlasso,
-  xg = mdl_windxg,
-  rf = mdl_windrf
+  xg    = mdl_windxg,
+  rf    = mdl_windrf,
+  nn    = mdl_windnn
 )
 
 wind_resamps <- resamples(windmodel_list)
@@ -335,6 +492,11 @@ imp <- rbind(
     rownames_to_column() %>%
     mutate(model = "GLM",
            tech = "Wind"),
+  varimp_windnn[[1]] %>%
+    as.data.frame() %>%
+    rownames_to_column() %>%
+    mutate(model = "NN",
+           tech = "Wind"),
 
   varimp_solarrf[[1]] %>%
     as.data.frame() %>%
@@ -357,6 +519,11 @@ imp <- rbind(
     as.data.frame() %>%
     rownames_to_column() %>%
     mutate(model = "GLM",
+           tech = "Solar"),
+  varimp_solarnn[[1]] %>%
+    as.data.frame() %>%
+    rownames_to_column() %>%
+    mutate(model = "NN",
            tech = "Solar")
 ) %>%
   mutate(rowname = recode(
@@ -380,11 +547,86 @@ imp <- rbind(
     "lulc_agriculture"  = "Agriculture",
     "lulc_developed"    = "Developed",
     "lulc_other"        = "Otherland",
-    "region_nordovest"  = "Nord-Ovest",
-    "region_nordest"    = "Nord-Est",
-    "region_centro"     = "Centro",
-    "region_sud"        = "Sud",
-    "region_isole"      = "Isole",
+    # WorldClim BIO
+    "wclim_bio01"       = "Annual mean temp (WC)",
+    "wclim_bio02"       = "Diurnal temp range (WC)",
+    "wclim_bio03"       = "Isothermality (WC)",
+    "wclim_bio04"       = "Temp seasonality (WC)",
+    "wclim_bio05"       = "Max temp warmest (WC)",
+    "wclim_bio06"       = "Min temp coldest (WC)",
+    "wclim_bio07"       = "Annual temp range (WC)",
+    "wclim_bio08"       = "Temp wettest qtr (WC)",
+    "wclim_bio09"       = "Temp driest qtr (WC)",
+    "wclim_bio10"       = "Temp warmest qtr (WC)",
+    "wclim_bio11"       = "Temp coldest qtr (WC)",
+    "wclim_bio12"       = "Annual precip (WC)",
+    "wclim_bio13"       = "Precip wettest mo (WC)",
+    "wclim_bio14"       = "Precip driest mo (WC)",
+    "wclim_bio15"       = "Precip seasonality (WC)",
+    "wclim_bio16"       = "Precip wettest qtr (WC)",
+    "wclim_bio17"       = "Precip driest qtr (WC)",
+    "wclim_bio18"       = "Precip warmest qtr (WC)",
+    "wclim_bio19"       = "Precip coldest qtr (WC)",
+    # ERA5 climate
+    "era5_t2m_mean"     = "Temperature mean (ERA5)",
+    "era5_t2m_max"      = "Temperature max (ERA5)",
+    "era5_t2m_min"      = "Temperature min (ERA5)",
+    "era5_t2m_std"      = "Temperature SD (ERA5)",
+    "era5_d2m_mean"     = "Dewpoint temp (ERA5)",
+    "era5_tp_sum"       = "Precipitation (ERA5)",
+    "era5_cp_sum"       = "Convective precip (ERA5)",
+    "era5_sf_sum"       = "Snowfall (ERA5)",
+    "era5_e_sum"        = "Evaporation (ERA5)",
+    "era5_pev_sum"      = "Potential evap (ERA5)",
+    "era5_ro_sum"       = "Runoff (ERA5)",
+    "era5_u10_mean"     = "Wind U 10m (ERA5)",
+    "era5_v10_mean"     = "Wind V 10m (ERA5)",
+    "era5_u100_mean"    = "Wind U 100m (ERA5)",
+    "era5_v100_mean"    = "Wind V 100m (ERA5)",
+    "era5_i10fg_mean"   = "Wind gust (ERA5)",
+    "era5_ssrd_sum"     = "Solar radiation (ERA5)",
+    "era5_ssr_sum"      = "Net solar rad (ERA5)",
+    "era5_cdir_sum"     = "Clear-sky direct solar (ERA5)",
+    "era5_ssrdc_sum"    = "Clear-sky solar down (ERA5)",
+    "era5_tcc_mean"     = "Cloud cover (ERA5)",
+    "era5_blh_mean"     = "Boundary layer H (ERA5)",
+    "era5_sp_mean"      = "Surface pressure (ERA5)",
+    "era5_cape_mean"    = "CAPE (ERA5)",
+    # LUH3 land use
+    "luh3_primf"        = "Primary forest (LUH3)",
+    "luh3_primn"        = "Primary non-forest (LUH3)",
+    "luh3_secdf"        = "Secondary forest (LUH3)",
+    "luh3_secdn"        = "Secondary non-forest (LUH3)",
+    "luh3_pastr"        = "Pasture (LUH3)",
+    "luh3_range"        = "Rangeland (LUH3)",
+    "luh3_urban"        = "Urban (LUH3)",
+    "luh3_c3ann"        = "C3 annual crops (LUH3)",
+    "luh3_c4ann"        = "C4 annual crops (LUH3)",
+    "luh3_c3per"        = "C3 perennial crops (LUH3)",
+    "luh3_c4per"        = "C4 perennial crops (LUH3)",
+    "luh3_c3nfx"        = "N-fixing crops (LUH3)",
+    # NDVI
+    "wt_ndvi_mean"      = "NDVI (MODIS)",
+    "nuts2_itc1"        = "Piemonte",
+    "nuts2_itc2"        = "Valle d'Aosta",
+    "nuts2_itc3"        = "Liguria",
+    "nuts2_itc4"        = "Lombardia",
+    "nuts2_ith1"        = "PA Bolzano",
+    "nuts2_ith2"        = "PA Trento",
+    "nuts2_ith3"        = "Veneto",
+    "nuts2_ith4"        = "Friuli-VG",
+    "nuts2_ith5"        = "Emilia-Romagna",
+    "nuts2_iti1"        = "Toscana",
+    "nuts2_iti2"        = "Umbria",
+    "nuts2_iti3"        = "Marche",
+    "nuts2_iti4"        = "Lazio",
+    "nuts2_itf1"        = "Abruzzo",
+    "nuts2_itf2"        = "Molise",
+    "nuts2_itf3"        = "Campania",
+    "nuts2_itf4"        = "Puglia",
+    "nuts2_itf5"        = "Basilicata",
+    "nuts2_itf6"        = "Calabria",
+    "nuts2_itg1"        = "Sicilia",
     "env"            = "Environmental score",
     "cf"             = "Capacity factor",
     "lag"            = "Spatial lag"
@@ -393,8 +635,14 @@ imp <- rbind(
 save(imp, solar_resamps, wind_resamps, rst_s, rst_w, file = "./derived/model_results.RData")
 load("./derived/model_results.RData")
 
-# Save model objects for calibration and spatial CV in performance.R
+# Save model objects for calibration, spatial CV, and threshold metrics in performance.R
+saveRDS(mdl_solarglm,   "./derived/mdl_solarglm.rds")
+saveRDS(mdl_solarlasso, "./derived/mdl_solarlasso.rds")
 saveRDS(mdl_solarrf,    "./derived/mdl_solarrf.rds")
-saveRDS(mdl_windrf,     "./derived/mdl_windrf.rds")
 saveRDS(mdl_solarxg,    "./derived/mdl_solarxg.rds")
+saveRDS(mdl_solarnn,    "./derived/mdl_solarnn.rds")
+saveRDS(mdl_windglm,    "./derived/mdl_windglm.rds")
+saveRDS(mdl_windlasso,  "./derived/mdl_windlasso.rds")
+saveRDS(mdl_windrf,     "./derived/mdl_windrf.rds")
 saveRDS(mdl_windxg,     "./derived/mdl_windxg.rds")
+saveRDS(mdl_windnn,     "./derived/mdl_windnn.rds")

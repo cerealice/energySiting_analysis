@@ -122,31 +122,165 @@ ggsave("./fig/original/f_varimp.png", f_imp, width = 10, height = 5, dpi = 300)
 cat("Saved: ./fig/original/f_varimp.png\n")
 
 
-# ── 5. What is still missing for the paper ────────────────────────────────────
+# ── 5. Load all eight model objects ──────────────────────────────────────────
 
-cat("
-══════════════════════════════════════════════════════════
-  NEXT STEPS NEEDED BEFORE SUBMISSION
-══════════════════════════════════════════════════════════
+mdl_solarglm   <- readRDS("./derived/mdl_solarglm.rds")
+mdl_solarlasso <- readRDS("./derived/mdl_solarlasso.rds")
+mdl_solarrf    <- readRDS("./derived/mdl_solarrf.rds")
+mdl_solarxg    <- readRDS("./derived/mdl_solarxg.rds")
+mdl_solarnn    <- readRDS("./derived/mdl_solarnn.rds")
+mdl_windglm    <- readRDS("./derived/mdl_windglm.rds")
+mdl_windlasso  <- readRDS("./derived/mdl_windlasso.rds")
+mdl_windrf     <- readRDS("./derived/mdl_windrf.rds")
+mdl_windxg     <- readRDS("./derived/mdl_windxg.rds")
+mdl_windnn     <- readRDS("./derived/mdl_windnn.rds")
 
-[DONE]  10-fold random CV  — AUC, Sens, Spec reported
-[TODO]  Spatial / blocked CV  (blockCV or CAST package)
-        → Requires re-fitting models; random CV likely
-          overestimates OOS performance by ~0.05–0.15 AUC
-        → Run: library(blockCV); spatialBlock(...)
+model_list <- list(
+  Solar = list(GLM = mdl_solarglm, Lasso = mdl_solarlasso, RF = mdl_solarrf, GBM = mdl_solarxg, NN = mdl_solarnn),
+  Wind  = list(GLM = mdl_windglm,  Lasso = mdl_windlasso,  RF = mdl_windrf,  GBM = mdl_windxg,  NN = mdl_windnn)
+)
 
-[TODO]  Calibration check (reliability diagram)
-        → Requires model objects (mdl_solarrf, etc.)
-        → Add to modeling.R:
-          saveRDS(mdl_solarrf,  './derived/mdl_solarrf.rds')
-          saveRDS(mdl_windrf,   './derived/mdl_windrf.rds')
-          saveRDS(mdl_solarxg,  './derived/mdl_solarxg.rds')
-          saveRDS(mdl_windxg,   './derived/mdl_windxg.rds')
-        → Then: calibrate with val.prob() or CalibrationCurves
 
-[TODO]  Area of applicability
-        → library(CAST); aoa(newdata, model)
+# ── 6. Helpers for threshold-dependent metrics ────────────────────────────────
 
-[TODO]  Temporal hold-out validation (plants built after year X)
-        → Requires commissioning dates on presence points
-")
+# Extract fold predictions at best-tune parameters.
+# Uses near-equality for numeric hyperparams (lambda, etc.) to avoid fp issues.
+get_pred_df <- function(model) {
+  pred <- model$pred
+  bt   <- model$bestTune
+  for (nm in names(bt)) {
+    if (is.numeric(pred[[nm]])) {
+      pred <- pred[abs(pred[[nm]] - bt[[nm]]) < 1e-10, ]
+    } else {
+      pred <- pred[pred[[nm]] == bt[[nm]], ]
+    }
+  }
+  pred
+}
+
+# Precision / Recall / F1  (positive class = X1 = presence)
+metrics_at_threshold <- function(pred_df, threshold) {
+  pred_class <- ifelse(pred_df$X1 >= threshold, "X1", "X0")
+  obs        <- as.character(pred_df$obs)
+  TP <- sum(pred_class == "X1" & obs == "X1")
+  FP <- sum(pred_class == "X1" & obs == "X0")
+  FN <- sum(pred_class == "X0" & obs == "X1")
+  TN <- sum(pred_class == "X0" & obs == "X0")
+  prec   <- if ((TP + FP) == 0) NA_real_ else TP / (TP + FP)
+  recall <- if ((TP + FN) == 0) NA_real_ else TP / (TP + FN)
+  f1     <- if (is.na(prec) || is.na(recall) || (prec + recall) == 0) NA_real_
+            else 2 * prec * recall / (prec + recall)
+  c(Precision = prec, Recall = recall, F1 = f1,
+    TP = TP, FP = FP, FN = FN, TN = TN)
+}
+
+# Threshold that maximises F1 (search over a fine grid)
+optimal_threshold <- function(pred_df, grid = seq(0.05, 0.95, by = 0.01)) {
+  f1s <- sapply(grid, function(t) metrics_at_threshold(pred_df, t)["F1"])
+  grid[which.max(f1s)]
+}
+
+# PR-AUC via trapezoidal rule across a threshold grid (positive = X1)
+compute_pr_auc <- function(pred_df, grid = seq(0, 1, by = 0.005)) {
+  pts <- t(sapply(grid, function(t) metrics_at_threshold(pred_df, t)[c("Recall", "Precision")]))
+  pts <- as.data.frame(pts)
+  pts <- pts[!is.na(pts$Precision) & !is.na(pts$Recall), ]
+  pts <- pts[order(pts$Recall), ]
+  with(pts, sum(diff(Recall) * (head(Precision, -1) + tail(Precision, -1)) / 2))
+}
+
+
+# ── 7. Summary table: Precision / Recall / F1 / PR-AUC ───────────────────────
+
+thresh_summary <- bind_rows(lapply(names(model_list), function(tech) {
+  bind_rows(lapply(names(model_list[[tech]]), function(mdl_name) {
+    pd  <- get_pred_df(model_list[[tech]][[mdl_name]])
+    opt <- optimal_threshold(pd)
+    m05 <- metrics_at_threshold(pd, 0.5)
+    mop <- metrics_at_threshold(pd, opt)
+    pra <- compute_pr_auc(pd)
+    data.frame(
+      technology     = tech,
+      model          = mdl_name,
+      threshold_type = c("fixed_0.5", "optimal_F1"),
+      threshold      = c(0.5, opt),
+      Precision      = c(m05["Precision"], mop["Precision"]),
+      Recall         = c(m05["Recall"],    mop["Recall"]),
+      F1             = c(m05["F1"],        mop["F1"]),
+      PR_AUC         = pra,
+      stringsAsFactors = FALSE
+    )
+  }))
+}))
+
+cat("\n══════════════════════════════════════════════════════════\n")
+cat("  Precision / Recall / F1 / PR-AUC — 10-fold CV (pooled)\n")
+cat("══════════════════════════════════════════════════════════\n\n")
+print(as.data.frame(thresh_summary[, c("technology","model","threshold_type","threshold",
+                                       "Precision","Recall","F1","PR_AUC")]),
+      row.names = FALSE, digits = 3)
+
+
+# ── 8. ROC and PR curves (pooled across folds) ────────────────────────────────
+
+make_curve_data <- function(tech, model_list_tech, grid = seq(0, 1, by = 0.005)) {
+  bind_rows(lapply(names(model_list_tech), function(mdl_name) {
+    pd  <- get_pred_df(model_list_tech[[mdl_name]])
+    obs <- as.character(pd$obs)
+    pts <- t(sapply(grid, function(t) {
+      pc  <- ifelse(pd$X1 >= t, "X1", "X0")
+      TP  <- sum(pc == "X1" & obs == "X1")
+      FP  <- sum(pc == "X1" & obs == "X0")
+      FN  <- sum(pc == "X0" & obs == "X1")
+      TN  <- sum(pc == "X0" & obs == "X0")
+      TPR <- if ((TP + FN) == 0) NA_real_ else TP / (TP + FN)   # recall / sensitivity
+      FPR <- if ((TN + FP) == 0) NA_real_ else FP / (TN + FP)   # 1 − specificity
+      PPV <- if ((TP + FP) == 0) NA_real_ else TP / (TP + FP)   # precision
+      c(Recall = TPR, FPR = FPR, Precision = PPV)
+    }))
+    as.data.frame(pts) %>%
+      mutate(model = mdl_name, technology = tech, threshold = grid)
+  }))
+}
+
+curves <- bind_rows(
+  make_curve_data("Solar", model_list$Solar),
+  make_curve_data("Wind",  model_list$Wind)
+)
+
+## ROC curves
+p_roc_curves <- curves %>%
+  filter(!is.na(Recall), !is.na(FPR)) %>%
+  ggplot(aes(x = FPR, y = Recall, colour = model)) +
+  geom_line(linewidth = 0.8) +
+  geom_abline(linetype = "dashed", colour = "grey60") +
+  facet_wrap(~ technology) +
+  scale_colour_brewer(palette = "Set1", name = "Model") +
+  labs(x = "False positive rate (1 − Specificity)",
+       y = "True positive rate (Recall)",
+       title = "ROC curves — 10-fold CV (pooled folds)") +
+  theme_bw() +
+  theme(panel.grid.minor = element_blank(),
+        strip.background = element_rect(fill = "gray20"),
+        strip.text = element_text(colour = "white"))
+
+ggsave("./fig/original/f_roc_curves.png", p_roc_curves, width = 10, height = 5, dpi = 300)
+cat("Saved: ./fig/original/f_roc_curves.png\n")
+
+## PR curves
+p_pr_curves <- curves %>%
+  filter(!is.na(Recall), !is.na(Precision)) %>%
+  ggplot(aes(x = Recall, y = Precision, colour = model)) +
+  geom_line(linewidth = 0.8) +
+  facet_wrap(~ technology) +
+  scale_colour_brewer(palette = "Set1", name = "Model") +
+  labs(x = "Recall (True positive rate)",
+       y = "Precision (Positive predictive value)",
+       title = "Precision–Recall curves — 10-fold CV (pooled folds)") +
+  theme_bw() +
+  theme(panel.grid.minor = element_blank(),
+        strip.background = element_rect(fill = "gray20"),
+        strip.text = element_text(colour = "white"))
+
+ggsave("./fig/original/f_pr_curves.png", p_pr_curves, width = 10, height = 5, dpi = 300)
+cat("Saved: ./fig/original/f_pr_curves.png\n")

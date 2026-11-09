@@ -1,15 +1,7 @@
 source("./syntax/function.R")
 librarian::shelf("blockCV")
 
-# ── Shared model formula (must match modeling.R exactly) ─────────────────────
-# lulc_other = reference land-cover class (omitted → "Other lands" baseline)
-# region_isole = reference region dummy  (omitted → "Isole" baseline)
-region_model <- treat ~ tx + roads + sub + slope + pop + unemploy + foreignborn +
-  poverty + gdp_pc + inst_quality +
-  lulc_forest + lulc_grassland + lulc_shrubland + lulc_riparian + lulc_sparse +
-  lulc_agriculture + lulc_developed +
-  region_nordovest + region_nordest + region_centro + region_sud +
-  env + cf + lag
+# region_model is defined once in function.R (sourced above) — do not redefine here.
 
 
 # ── 1. Recover spatial coordinates for each zone ──────────────────────────────

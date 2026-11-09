@@ -18,16 +18,39 @@ wind_location_rast  <- rast("./derived/wind_hull_existing.tif")
 # fer replaces rps; foreignborn replaces minority; 5 Italian regions added;
 # gdp_pc and inst_quality added from Zenodo DOI 10.5281/zenodo.11121790).
 names(coeff_stack) <- c(
-  "tx", "roads", "sub",                                          # infrastructure
-  "slope", "pop",                                                # biophysical / demographics
-  "unemploy", "foreignborn", "poverty",                          # socioeconomic (ISTAT)
-  "gdp_pc", "inst_quality",                                      # socioeconomic (Zenodo)
-  # "fer",                                                       # policy — excluded (constant)
+  # ── Continuous (1–66) ───────────────────────────────────────────────────────
+  "tx", "roads", "sub",                   # infrastructure
+  "slope", "pop",                          # biophysical / demographics
+  "unemploy", "foreignborn", "poverty",   # socioeconomic (ISTAT)
+  "gdp_pc", "inst_quality",               # socioeconomic (Zenodo)
+  # WorldClim 2.1 BIO1-BIO19
+  "wclim_bio01", "wclim_bio02", "wclim_bio03", "wclim_bio04", "wclim_bio05",
+  "wclim_bio06", "wclim_bio07", "wclim_bio08", "wclim_bio09", "wclim_bio10",
+  "wclim_bio11", "wclim_bio12", "wclim_bio13", "wclim_bio14", "wclim_bio15",
+  "wclim_bio16", "wclim_bio17", "wclim_bio18", "wclim_bio19",
+  # ERA5 annual means 2000-2020
+  "era5_t2m_mean", "era5_t2m_max", "era5_t2m_min", "era5_t2m_std",
+  "era5_d2m_mean",
+  "era5_tp_sum", "era5_cp_sum", "era5_sf_sum",
+  "era5_e_sum", "era5_pev_sum", "era5_ro_sum",
+  "era5_u10_mean", "era5_v10_mean", "era5_u100_mean", "era5_v100_mean", "era5_i10fg_mean",
+  "era5_ssrd_sum", "era5_ssr_sum", "era5_cdir_sum", "era5_ssrdc_sum",
+  "era5_tcc_mean", "era5_blh_mean", "era5_sp_mean", "era5_cape_mean",
+  # LUH3 land-use states 2020
+  "luh3_primf", "luh3_primn", "luh3_secdf", "luh3_secdn",
+  "luh3_pastr", "luh3_range", "luh3_urban",
+  "luh3_c3ann", "luh3_c4ann", "luh3_c3per", "luh3_c4per", "luh3_c3nfx",
+  # MODIS NDVI mean 2003-2020
+  "wt_ndvi_mean",
+  # ── Binary (67–95) ──────────────────────────────────────────────────────────
   "lulc_forest", "lulc_grassland", "lulc_shrubland",
   "lulc_riparian", "lulc_sparse", "lulc_agriculture",
-  "lulc_developed", "lulc_other",                                # land cover
-  "region_nordovest", "region_nordest", "region_centro",
-  "region_sud", "region_isole"                                   # Italian NUTS-1 regions
+  "lulc_developed", "lulc_other",                                # CORINE land cover
+  "nuts2_itc1", "nuts2_itc2", "nuts2_itc3", "nuts2_itc4",        # Nord-Ovest
+  "nuts2_ith1", "nuts2_ith2", "nuts2_ith3", "nuts2_ith4", "nuts2_ith5",  # Nord-Est
+  "nuts2_iti1", "nuts2_iti2", "nuts2_iti3", "nuts2_iti4",        # Centro
+  "nuts2_itf1", "nuts2_itf2", "nuts2_itf3", "nuts2_itf4", "nuts2_itf5", "nuts2_itf6",  # Sud
+  "nuts2_itg1", "nuts2_itg2"                                     # Isole (itg2 = reference)
 )
 
 names(coeff_future) <- c("tx", "sub")
