@@ -12,23 +12,19 @@ mdl_windrf_sp  <- readRDS("./derived/mdl_windrf_spatialcv.rds")
 
 # ── Build updated SITE sub-objects ────────────────────────────────────────────
 
-# 1. CV fold AUC (random 10-fold, from model_results.RData)
-get_folds <- function(resamps, key) resamps$values[[paste0(key, "~ROC")]]
+# 1. CV fold metrics (random 10-fold, from model_results.RData)
+# Keys: <model> = ROC folds, <model>_sens = Sensitivity folds, <model>_spec = Specificity folds
+get_folds <- function(resamps, key, metric = "ROC") resamps$values[[paste0(key, "~", metric)]]
 
-cv <- list(
-  solar = list(
-    glm   = get_folds(solar_resamps, "glm"),
-    lasso = get_folds(solar_resamps, "lasso"),
-    rf    = get_folds(solar_resamps, "rf"),
-    xg    = get_folds(solar_resamps, "xg")
-  ),
-  wind = list(
-    glm   = get_folds(wind_resamps, "glm"),
-    lasso = get_folds(wind_resamps, "lasso"),
-    rf    = get_folds(wind_resamps, "rf"),
-    xg    = get_folds(wind_resamps, "xg")
-  )
-)
+make_cv <- function(resamps) {
+  keys <- c("glm", "lasso", "rf", "xg")
+  roc  <- setNames(lapply(keys, function(k) get_folds(resamps, k, "ROC")),   keys)
+  sens <- setNames(lapply(keys, function(k) get_folds(resamps, k, "Sens")),  paste0(keys, "_sens"))
+  spec <- setNames(lapply(keys, function(k) get_folds(resamps, k, "Spec")),  paste0(keys, "_spec"))
+  c(roc, sens, spec)
+}
+
+cv <- list(solar = make_cv(solar_resamps), wind = make_cv(wind_resamps))
 
 # 2. Spatial CV fold AUC (5-fold, from spatialcv models)
 spcv <- list(
