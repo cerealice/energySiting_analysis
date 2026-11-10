@@ -94,28 +94,11 @@ var_labels <- c(
   "lulc_agriculture"   = "Agriculture",
   "lulc_developed"     = "Developed",
   # lulc_other omitted — reference class
-  # NUTS-2 regions (reference = nuts2_itg2 / Sardegna)
-  "nuts2_itc1"         = "Piemonte",
-  "nuts2_itc2"         = "Valle d'Aosta",
-  "nuts2_itc3"         = "Liguria",
-  "nuts2_itc4"         = "Lombardia",
-  "nuts2_ith1"         = "PA Bolzano",
-  "nuts2_ith2"         = "PA Trento",
-  "nuts2_ith3"         = "Veneto",
-  "nuts2_ith4"         = "Friuli-VG",
-  "nuts2_ith5"         = "Emilia-Romagna",
-  "nuts2_iti1"         = "Toscana",
-  "nuts2_iti2"         = "Umbria",
-  "nuts2_iti3"         = "Marche",
-  "nuts2_iti4"         = "Lazio",
-  "nuts2_itf1"         = "Abruzzo",
-  "nuts2_itf2"         = "Molise",
-  "nuts2_itf3"         = "Campania",
-  "nuts2_itf4"         = "Puglia",
-  "nuts2_itf5"         = "Basilicata",
-  "nuts2_itf6"         = "Calabria",
-  "nuts2_itg1"         = "Sicilia",
-  # nuts2_itg2 omitted — reference class (Sardegna)
+  # NUTS-1 macro-regions (reference = Isole)
+  "nuts1Nord-Ovest"    = "Nord-Ovest",
+  "nuts1Nord-Est"      = "Nord-Est",
+  "nuts1Centro"        = "Centro",
+  "nuts1Sud"           = "Sud",
   "env"                = "Environmental score",
   "cf"                 = "Capacity factor",
   "lag"                = "Spatial lag"
@@ -152,12 +135,8 @@ region_model <- treat ~
   # CORINE land cover (lulc_other omitted — reference)
   lulc_forest + lulc_grassland + lulc_shrubland + lulc_riparian +
   lulc_sparse + lulc_agriculture + lulc_developed +
-  # NUTS-2 regions (nuts2_itg2 omitted — reference: Sardegna)
-  nuts2_itc1 + nuts2_itc2 + nuts2_itc3 + nuts2_itc4 +
-  nuts2_ith1 + nuts2_ith2 + nuts2_ith3 + nuts2_ith4 + nuts2_ith5 +
-  nuts2_iti1 + nuts2_iti2 + nuts2_iti3 + nuts2_iti4 +
-  nuts2_itf1 + nuts2_itf2 + nuts2_itf3 + nuts2_itf4 + nuts2_itf5 + nuts2_itf6 +
-  nuts2_itg1 +
+  # NUTS-1 macro-regions (5 levels; reference = Isole: Sicilia + Sardegna)
+  nuts1 +
   # Technology-specific
   env + cf + lag
 
@@ -172,6 +151,23 @@ impute_dat <- function(df) {
     mutate(across(where(is.numeric), ~replace_na(., median(., na.rm = TRUE))))
 }
 
+# Derive NUTS-1 macro-region factor from the 20 binary NUTS-2 columns.
+# Reference level = "Isole" (Sicilia + Sardegna) — smallest renewable share,
+# matches the omitted nuts2_itg2 reference used previously.
+add_nuts1 <- function(df) {
+  df %>% mutate(nuts1 = factor(
+    case_when(
+      nuts2_itc1 == 1 | nuts2_itc2 == 1 | nuts2_itc3 == 1 | nuts2_itc4 == 1 ~ "Nord-Ovest",
+      nuts2_ith1 == 1 | nuts2_ith2 == 1 | nuts2_ith3 == 1 | nuts2_ith4 == 1 | nuts2_ith5 == 1 ~ "Nord-Est",
+      nuts2_iti1 == 1 | nuts2_iti2 == 1 | nuts2_iti3 == 1 | nuts2_iti4 == 1 ~ "Centro",
+      nuts2_itf1 == 1 | nuts2_itf2 == 1 | nuts2_itf3 == 1 | nuts2_itf4 == 1 |
+        nuts2_itf5 == 1 | nuts2_itf6 == 1 ~ "Sud",
+      TRUE ~ "Isole"
+    ),
+    levels = c("Isole", "Nord-Ovest", "Nord-Est", "Centro", "Sud")
+  ))
+}
+
 ### combined
 rst_s <- data.frame()
 aic <- c()
@@ -182,6 +178,7 @@ for(i in 1:10){
     rbind(solar.cov.existing) %>%
     mutate(treat = factor(treat)) %>%
     impute_dat() %>%
+    add_nuts1() %>%
     mutate(treat = factor(make.names(treat)))
 
   if (nrow(s_dat) == 0 || length(levels(s_dat$treat)) < 2) {
@@ -339,6 +336,7 @@ for(i in 1:10){
     rbind(wind.cov.existing) %>%
     mutate(treat = factor(treat)) %>%
     impute_dat() %>%
+    add_nuts1() %>%
     mutate(treat = factor(make.names(treat)))
 
   if (nrow(w_dat) == 0 || length(levels(w_dat$treat)) < 2) {
