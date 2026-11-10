@@ -168,7 +168,11 @@ run_setup <- function(force = FALSE) {
     # LUH3
     "luh3_primf.tif", "luh3_urban.tif", "luh3_c3ann.tif",
     # NDVI
-    "wt_ndvi_mean.tif"
+    "wt_ndvi_mean.tif",
+    # Derived ERA5 features (section 4 of make_worldtensor.R)
+    "era5_ws100_mean.tif", "era5_wpd100.tif",
+    "era5_clearness.tif", "era5_direct_frac.tif",
+    "era5_ssrd_iav.tif", "era5_ws100_iav.tif"
   ))
   conditional_run(wt_outputs, "syntax/make_worldtensor.R", force)
 
