@@ -87,6 +87,24 @@ lulc_sep_vars <- c("Forest", "Grassland", "Shrubland", "Riparian",
 #         plot.title=element_text(family="Franklin Gothic Demi", size=16, hjust = -0.09)) 
 
 
+# ── NUTS-2 → NUTS-1 aggregation ───────────────────────────────────────────────
+# modeling.R rename map already relabelled nuts2_itc1..itc4 → "Nord-Ovest" etc.
+# Multiple NUTS-2 within the same macro-area now share a var name; collapse them
+# by mean coefficient and pooled SE before plotting.
+aggregate_nuts <- function(rst) {
+  rst %>%
+    group_by(var, Group) %>%
+    summarise(
+      pe    = mean(pe, na.rm = TRUE),
+      se    = sqrt(mean(se^2, na.rm = TRUE)),
+      color = if_else(abs(mean(pe, na.rm = TRUE)) /
+                        sqrt(mean(se^2, na.rm = TRUE)) > 1.96, "Y", "N"),
+      .groups = "drop"
+    )
+}
+rst_s <- aggregate_nuts(rst_s)
+rst_w <- aggregate_nuts(rst_w)
+
 s_reg1 <- rst_s %>%
   filter(!var %in% lulc_sep_vars, color == "Y") %>%
   mutate(Group = factor(Group),

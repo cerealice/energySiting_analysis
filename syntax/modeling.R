@@ -94,11 +94,17 @@ var_labels <- c(
   "lulc_agriculture"   = "Agriculture",
   "lulc_developed"     = "Developed",
   # lulc_other omitted — reference class
-  # NUTS-1 macro-regions (reference = Isole)
-  "nuts1Nord-Ovest"    = "Nord-Ovest",
-  "nuts1Nord-Est"      = "Nord-Est",
-  "nuts1Centro"        = "Centro",
-  "nuts1Sud"           = "Sud",
+  # NUTS-2 regions (aggregated to NUTS-1 in plot.R Figure 2)
+  "nuts2_itc1" = "Nord-Ovest", "nuts2_itc2" = "Nord-Ovest",
+  "nuts2_itc3" = "Nord-Ovest", "nuts2_itc4" = "Nord-Ovest",
+  "nuts2_ith1" = "Nord-Est",   "nuts2_ith2" = "Nord-Est",
+  "nuts2_ith3" = "Nord-Est",   "nuts2_ith4" = "Nord-Est",   "nuts2_ith5" = "Nord-Est",
+  "nuts2_iti1" = "Centro",     "nuts2_iti2" = "Centro",
+  "nuts2_iti3" = "Centro",     "nuts2_iti4" = "Centro",
+  "nuts2_itf1" = "Sud",        "nuts2_itf2" = "Sud",
+  "nuts2_itf3" = "Sud",        "nuts2_itf4" = "Sud",
+  "nuts2_itf5" = "Sud",        "nuts2_itf6" = "Sud",
+  "nuts2_itg1" = "Sicilia",
   "env"                = "Environmental score",
   "cf"                 = "Capacity factor",
   "lag"                = "Spatial lag"
@@ -135,8 +141,12 @@ region_model <- treat ~
   # CORINE land cover (lulc_other omitted — reference)
   lulc_forest + lulc_grassland + lulc_shrubland + lulc_riparian +
   lulc_sparse + lulc_agriculture + lulc_developed +
-  # NUTS-1 macro-regions (5 levels; reference = Isole: Sicilia + Sardegna)
-  nuts1 +
+  # NUTS-2 regions (nuts2_itg2 omitted — reference: Sardegna)
+  nuts2_itc1 + nuts2_itc2 + nuts2_itc3 + nuts2_itc4 +
+  nuts2_ith1 + nuts2_ith2 + nuts2_ith3 + nuts2_ith4 + nuts2_ith5 +
+  nuts2_iti1 + nuts2_iti2 + nuts2_iti3 + nuts2_iti4 +
+  nuts2_itf1 + nuts2_itf2 + nuts2_itf3 + nuts2_itf4 + nuts2_itf5 + nuts2_itf6 +
+  nuts2_itg1 +
   # Technology-specific
   env + cf + lag
 
@@ -178,7 +188,6 @@ for(i in 1:10){
     rbind(solar.cov.existing) %>%
     mutate(treat = factor(treat)) %>%
     impute_dat() %>%
-    add_nuts1() %>%
     mutate(treat = factor(make.names(treat)))
 
   if (nrow(s_dat) == 0 || length(levels(s_dat$treat)) < 2) {
@@ -336,7 +345,6 @@ for(i in 1:10){
     rbind(wind.cov.existing) %>%
     mutate(treat = factor(treat)) %>%
     impute_dat() %>%
-    add_nuts1() %>%
     mutate(treat = factor(make.names(treat)))
 
   if (nrow(w_dat) == 0 || length(levels(w_dat$treat)) < 2) {
