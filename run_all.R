@@ -178,14 +178,14 @@ run_setup <- function(force = FALSE) {
     "syntax/make_worldclim.R", force
   )
 
-  # 10. Covariate stack (rebuild if layer count ≠ 95)
+  # 10. Covariate stack (rebuild if layer count ≠ 102)
   stack_path <- "./derived/covStack.tif"
   stack_ok <- !force && tryCatch({
-    terra::nlyr(terra::rast(stack_path)) == 95L
+    terra::nlyr(terra::rast(stack_path)) == 102L
   }, error = function(e) FALSE)
 
   if (stack_ok) {
-    cat(sprintf("\n[%s] ── SKIP: stack.R  (covStack.tif has 95 layers)\n",
+    cat(sprintf("\n[%s] ── SKIP: stack.R  (covStack.tif has 102 layers)\n",
                 format(Sys.time(), "%H:%M:%S")))
   } else {
     run_script("syntax/stack.R")
@@ -196,7 +196,7 @@ run_setup <- function(force = FALSE) {
 
 force_run_setup <- function() run_setup(force = TRUE)
 
-run_setup()  # run one-time setup (skips existing outputs)
+#run_setup()  # run one-time setup (skips existing outputs)
 
 # ── MAIN ANALYSIS PIPELINE ────────────────────────────────────────────────────
 # Run every time presence data, covariates, or model code changes.
@@ -208,8 +208,8 @@ cat("═════════════════════════
 
 t_total <- proc.time()
 
-run_script("syntax/tech.R")         # presence locations (GSPT/GWPT + RSE Atlante)
-run_script("syntax/absence.R")      # pseudo-absence sampling
+conditional_run("./derived/location.RData", "syntax/tech.R")   # presence locations (GSPT/GWPT + RSE Atlante)
+conditional_run("./derived/absence.RData",  "syntax/absence.R") # pseudo-absence sampling
 run_script("syntax/zonal.R")        # covariate extraction
 run_script("syntax/modeling.R")     # GLM, Lasso, RF, GBM, NN  [slow ~30–60 min]
 run_script("syntax/performance.R")  # model comparison table + plots

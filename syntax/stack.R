@@ -66,9 +66,9 @@ build_stack <- function(paths, layer_names, scale_up_to, out_path) {
 #
 # Layer ordering: ALL continuous variables first (z-scored by build_stack),
 # then binary indicators (unscaled). scale_up_to tracks the boundary.
-# Continuous: 10 existing + 19 WorldClim + 24 ERA5 + 12 LUH3 + 1 NDVI = 66
+# Continuous: 10 existing + 19 WorldClim + 24 ERA5 + 12 LUH3 + 1 NDVI + 7 derived = 73
 # Binary    : 8 LULC + 21 NUTS-2 = 29
-# Total     : 95
+# Total     : 102
 
 cov_paths <- c(
   # ── Continuous (layers 1–66, z-scored) ────────────────────────────────────
@@ -152,7 +152,16 @@ cov_paths <- c(
   # MODIS NDVI mean 2003-2020 (66)
   file.path(processed_layer_path, "wt_ndvi_mean.tif"),
 
-  # ── Binary (layers 67–95, unscaled) ───────────────────────────────────────
+  # Derived ERA5 features (67–73) — computed by make_worldtensor.R section 4
+  file.path(processed_layer_path, "era5_ws10_mean.tif"),   # wind speed 10m
+  file.path(processed_layer_path, "era5_ws100_mean.tif"),  # wind speed 100m (hub height)
+  file.path(processed_layer_path, "era5_wpd100.tif"),      # wind power density 100m (∝ ws³)
+  file.path(processed_layer_path, "era5_clearness.tif"),   # solar clearness index (ssr/ssrd)
+  file.path(processed_layer_path, "era5_direct_frac.tif"), # direct irradiance fraction (cdir/ssrdc)
+  file.path(processed_layer_path, "era5_ssrd_iav.tif"),    # solar radiation interannual variability
+  file.path(processed_layer_path, "era5_ws100_iav.tif"),   # wind speed 100m interannual variability
+
+  # ── Binary (layers 74–102, unscaled) ──────────────────────────────────────
 
   # CORINE land cover (67–74)
   file.path(processed_layer_path, "lulc_forest.tif"),
@@ -211,10 +220,14 @@ cov_names <- c(
   "luh3_c3ann", "luh3_c4ann", "luh3_c3per", "luh3_c4per", "luh3_c3nfx",
   # NDVI (66)
   "wt_ndvi_mean",
-  # CORINE LULC binary (67–74)
+  # Derived ERA5 (67–73)
+  "era5_ws10_mean", "era5_ws100_mean", "era5_wpd100",
+  "era5_clearness", "era5_direct_frac",
+  "era5_ssrd_iav", "era5_ws100_iav",
+  # CORINE LULC binary (74–81)
   "lulc_forest", "lulc_grassland", "lulc_shrubland", "lulc_riparian",
   "lulc_sparse", "lulc_agriculture", "lulc_developed", "lulc_other",
-  # NUTS-2 binary (75–95)
+  # NUTS-2 binary (82–102)
   "nuts2_itc1", "nuts2_itc2", "nuts2_itc3", "nuts2_itc4",
   "nuts2_ith1", "nuts2_ith2", "nuts2_ith3", "nuts2_ith4", "nuts2_ith5",
   "nuts2_iti1", "nuts2_iti2", "nuts2_iti3", "nuts2_iti4",
@@ -222,8 +235,8 @@ cov_names <- c(
   "nuts2_itg1", "nuts2_itg2"
 )
 
-# Layers 1–66 are continuous → z-scored; 67–95 are binary → unscaled
-build_stack(cov_paths, cov_names, scale_up_to = 66, out_path = "./derived/covStack.tif")
+# Layers 1–73 are continuous → z-scored; 74–102 are binary → unscaled
+build_stack(cov_paths, cov_names, scale_up_to = 73, out_path = "./derived/covStack.tif")
 
 
 # ── Solar-specific stack ──────────────────────────────────────────────────────
