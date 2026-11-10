@@ -42,7 +42,11 @@ names(coeff_stack) <- c(
   "luh3_c3ann", "luh3_c4ann", "luh3_c3per", "luh3_c4per", "luh3_c3nfx",
   # MODIS NDVI mean 2003-2020
   "wt_ndvi_mean",
-  # ── Binary (67–95) ──────────────────────────────────────────────────────────
+  # Derived ERA5 features
+  "era5_ws10_mean", "era5_ws100_mean", "era5_wpd100",
+  "era5_clearness", "era5_direct_frac",
+  "era5_ssrd_iav", "era5_ws100_iav",
+  # ── Binary (74–102) ─────────────────────────────────────────────────────────
   "lulc_forest", "lulc_grassland", "lulc_shrubland",
   "lulc_riparian", "lulc_sparse", "lulc_agriculture",
   "lulc_developed", "lulc_other",                                # CORINE land cover
