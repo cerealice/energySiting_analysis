@@ -28,6 +28,17 @@ if ! command -v R &>/dev/null; then
   exit 1
 fi
 
+# ── User R library (system library is read-only) ──────────────────────────────
+export R_LIBS_USER="$HOME/R/x86_64-pc-linux-gnu-library/4.4"
+mkdir -p "$R_LIBS_USER"
+
+# Install librarian on first run (librarian then installs everything else)
+R --no-save --no-restore -e "
+  if (!requireNamespace('librarian', quietly = TRUE))
+    install.packages('librarian', lib = Sys.getenv('R_LIBS_USER'),
+                     repos = 'https://cloud.r-project.org')
+"
+
 # ── Run pipeline ──────────────────────────────────────────────────────────────
 echo "Job started: $(date)"
 echo "Host: $(hostname)"
