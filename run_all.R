@@ -10,6 +10,16 @@
 #   force_run_setup()                 # re-run ALL setup steps unconditionally
 # ─────────────────────────────────────────────────────────────────────────────
 
+# ── Working directory (HPC-safe) ─────────────────────────────────────────────
+# When submitted via SLURM the job starts in the submission dir, not the
+# project root. RSCRIPT_ROOT can be set in the job script:
+#   export RSCRIPT_ROOT=/path/to/energySiting_analysis_Italy
+if (nchar(Sys.getenv("RSCRIPT_ROOT")) > 0) {
+  setwd(Sys.getenv("RSCRIPT_ROOT"))
+} else if (requireNamespace("here", quietly = TRUE)) {
+  setwd(here::here())
+}
+
 VAR_PATH <- "./data/processed_data/variables"
 
 # ── Helper: source a script with timing and error reporting ───────────────────

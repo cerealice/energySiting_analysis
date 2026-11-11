@@ -1,5 +1,13 @@
 source("./syntax/function.R")
 
+# ── Parallel workers ──────────────────────────────────────────────────────────
+# Use SLURM_CPUS_PER_TASK on HPC; fall back to half of local cores.
+n_workers <- as.integer(Sys.getenv("SLURM_CPUS_PER_TASK", unset = "0"))
+if (n_workers < 1L) n_workers <- max(1L, parallel::detectCores() %/% 2L)
+cl <- parallel::makeCluster(n_workers)
+doParallel::registerDoParallel(cl)
+message(sprintf("Parallel: %d workers registered", n_workers))
+
 ## modeling
 #### solar
 solar.cov.existing <- read_csv("./derived/existing_cov_solar.csv")
@@ -637,6 +645,8 @@ imp <- rbind(
     "cf"             = "Capacity factor",
     "lag"            = "Spatial lag"
   ))
+
+parallel::stopCluster(cl)
 
 save(imp, solar_resamps, wind_resamps, rst_s, rst_w, file = "./derived/model_results.RData")
 load("./derived/model_results.RData")

@@ -79,12 +79,12 @@ lulc_sep_vars <- c("Forest", "Grassland", "Shrubland", "Riparian",
 #   theme(panel.grid.minor = element_blank(),
 #         panel.grid.major.x = element_blank(),
 #         strip.background =element_rect(fill="gray22",color="gray22"),
-#         strip.text = element_text(color = 'white',family="Franklin Gothic Book",size=12),
+#         strip.text = element_text(color = 'white',family="sans",size=12),
 #         legend.position = "none",
-#         axis.text.x = element_text(color = "black",family="Franklin Gothic Book",size=6),
-#         axis.text.y = element_text(color = "black",family="Franklin Gothic Book",size=9),
-#         axis.title.x = element_text(color = "black",family="Franklin Gothic Book",size=11),
-#         plot.title=element_text(family="Franklin Gothic Demi", size=16, hjust = -0.09)) 
+#         axis.text.x = element_text(color = "black",family="sans",size=6),
+#         axis.text.y = element_text(color = "black",family="sans",size=9),
+#         axis.title.x = element_text(color = "black",family="sans",size=11),
+#         plot.title=element_text(family="sans", size=16, hjust = -0.09)) 
 
 
 # ── NUTS-2 → NUTS-1 aggregation ───────────────────────────────────────────────
@@ -118,12 +118,12 @@ s_reg1 <- rst_s %>%
   theme(panel.grid.minor = element_blank(),
         panel.grid.major.x = element_blank(),
         strip.background =element_rect(fill="gray22",color="gray22"),
-        strip.text = element_text(color = 'white',family="Franklin Gothic Book",size=12),
+        strip.text = element_text(color = 'white',family="sans",size=12),
         legend.position = "none",
-        axis.text.x = element_text(color = "black",family="Franklin Gothic Book",size=6),
-        axis.text.y = element_text(color = "black",family="Franklin Gothic Book",size=9),
-        axis.title.x = element_text(color = "black",family="Franklin Gothic Book",size=11),
-        plot.title=element_text(family="Franklin Gothic Demi", size=16, hjust = -0.22))
+        axis.text.x = element_text(color = "black",family="sans",size=6),
+        axis.text.y = element_text(color = "black",family="sans",size=9),
+        axis.title.x = element_text(color = "black",family="sans",size=11),
+        plot.title=element_text(family="sans", size=16, hjust = -0.22))
 
 
 s_reg2 <- rst_s %>%
@@ -139,12 +139,12 @@ s_reg2 <- rst_s %>%
   theme(panel.grid.minor = element_blank(),
         panel.grid.major.x = element_blank(),
         strip.background =element_rect(fill="gray22",color="gray22"),
-        strip.text = element_text(color = 'white',family="Franklin Gothic Book",size=12),
+        strip.text = element_text(color = 'white',family="sans",size=12),
         legend.position = c(0.7, 0.3),
-        axis.text.x = element_text(color = "black",family="Franklin Gothic Book",size=6),
-        axis.text.y = element_text(color = "black",family="Franklin Gothic Book",size=9),
-        axis.title.x = element_text(color = "black",family="Franklin Gothic Book",size=11),
-        plot.title=element_text(family="Franklin Gothic Demi", size=16, hjust = -0.09))
+        axis.text.x = element_text(color = "black",family="sans",size=6),
+        axis.text.y = element_text(color = "black",family="sans",size=9),
+        axis.title.x = element_text(color = "black",family="sans",size=11),
+        plot.title=element_text(family="sans", size=16, hjust = -0.09))
 
 
 # w_reg <- rst_w %>% 
@@ -161,12 +161,12 @@ s_reg2 <- rst_s %>%
 #   theme(panel.grid.minor = element_blank(),
 #         panel.grid.major.x = element_blank(),
 #         strip.background =element_rect(fill="gray22",color="gray22"),
-#         strip.text = element_text(color = 'white',family="Franklin Gothic Book",size=12),
+#         strip.text = element_text(color = 'white',family="sans",size=12),
 #         legend.position = "bottom",
-#         axis.text.x = element_text(color = "black",family="Franklin Gothic Book",size=6),
-#         axis.text.y = element_text(color = "black",family="Franklin Gothic Book",size=9),
-#         axis.title.x = element_text(color = "black",family="Franklin Gothic Book",size=11),
-#         plot.title=element_text(family="Franklin Gothic Demi", size=16,  hjust = -0.09)) 
+#         axis.text.x = element_text(color = "black",family="sans",size=6),
+#         axis.text.y = element_text(color = "black",family="sans",size=9),
+#         axis.title.x = element_text(color = "black",family="sans",size=11),
+#         plot.title=element_text(family="sans", size=16,  hjust = -0.09)) 
 
 
 w_reg1 <- rst_w %>%
@@ -182,12 +182,12 @@ w_reg1 <- rst_w %>%
   theme(panel.grid.minor = element_blank(),
         panel.grid.major.x = element_blank(),
         strip.background =element_rect(fill="gray22",color="gray22"),
-        strip.text = element_text(color = 'white',family="Franklin Gothic Book",size=12),
+        strip.text = element_text(color = 'white',family="sans",size=12),
         legend.position = "none",
-        axis.text.x = element_text(color = "black",family="Franklin Gothic Book",size=6),
-        axis.text.y = element_text(color = "black",family="Franklin Gothic Book",size=9),
-        axis.title.x = element_text(color = "black",family="Franklin Gothic Book",size=11),
-        plot.title=element_text(family="Franklin Gothic Demi", size=16, hjust = -0.22))
+        axis.text.x = element_text(color = "black",family="sans",size=6),
+        axis.text.y = element_text(color = "black",family="sans",size=9),
+        axis.title.x = element_text(color = "black",family="sans",size=11),
+        plot.title=element_text(family="sans", size=16, hjust = -0.22))
 
 w_reg2 <- rst_w %>%
   filter(Group == 5, !var %in% lulc_sep_vars, color == "Y") %>%
@@ -202,12 +202,12 @@ w_reg2 <- rst_w %>%
   theme(panel.grid.minor = element_blank(),
         panel.grid.major.x = element_blank(),
         strip.background =element_rect(fill="gray22",color="gray22"),
-        strip.text = element_text(color = 'white',family="Franklin Gothic Book",size=12),
+        strip.text = element_text(color = 'white',family="sans",size=12),
         legend.position = c(0.2, 0.7),
-        axis.text.x = element_text(color = "black",family="Franklin Gothic Book",size=6),
-        axis.text.y = element_text(color = "black",family="Franklin Gothic Book",size=9),
-        axis.title.x = element_text(color = "black",family="Franklin Gothic Book",size=11),
-        plot.title=element_text(family="Franklin Gothic Demi", size=20))
+        axis.text.x = element_text(color = "black",family="sans",size=6),
+        axis.text.y = element_text(color = "black",family="sans",size=9),
+        axis.title.x = element_text(color = "black",family="sans",size=11),
+        plot.title=element_text(family="sans", size=20))
 
 
 importance_s <- imp %>% 
@@ -220,12 +220,12 @@ importance_s <- imp %>%
   theme(panel.grid.minor = element_blank(),
         panel.grid.major.x = element_blank(),
         strip.background =element_rect(fill="gray22",color="gray22"),
-        strip.text = element_text(color = 'white',family="Franklin Gothic Book",size=12),
+        strip.text = element_text(color = 'white',family="sans",size=12),
         legend.position = "right",
-        axis.text.x = element_text(color = "black",family="Franklin Gothic Book",size=11, angle = 45, hjust = 1),
-        axis.text.y = element_text(color = "black",family="Franklin Gothic Book",size=9),
-        axis.title.x = element_text(color = "black",family="Franklin Gothic Book",size=9),
-        plot.title=element_text(family="Franklin Gothic Demi", size=16, hjust = -0.03)) 
+        axis.text.x = element_text(color = "black",family="sans",size=11, angle = 45, hjust = 1),
+        axis.text.y = element_text(color = "black",family="sans",size=9),
+        axis.title.x = element_text(color = "black",family="sans",size=9),
+        plot.title=element_text(family="sans", size=16, hjust = -0.03)) 
 
 
 importance_w <- imp %>% 
@@ -238,12 +238,12 @@ importance_w <- imp %>%
   theme(panel.grid.minor = element_blank(),
         panel.grid.major.x = element_blank(),
         strip.background =element_rect(fill="gray22",color="gray22"),
-        strip.text = element_text(color = 'white',family="Franklin Gothic Book",size=12),
+        strip.text = element_text(color = 'white',family="sans",size=12),
         legend.position = "right",
-        axis.text.x = element_text(color = "black",family="Franklin Gothic Book",size=11,angle = 45, hjust = 1),
-        axis.text.y = element_text(color = "black",family="Franklin Gothic Book",size=9),
-        axis.title.x = element_text(color = "black",family="Franklin Gothic Book",size=9),
-        plot.title=element_text(family="Franklin Gothic Demi", size=16, hjust = -0.02)) 
+        axis.text.x = element_text(color = "black",family="sans",size=11,angle = 45, hjust = 1),
+        axis.text.y = element_text(color = "black",family="sans",size=9),
+        axis.title.x = element_text(color = "black",family="sans",size=9),
+        plot.title=element_text(family="sans", size=16, hjust = -0.02)) 
 
 
 f2 <- ggarrange(ggarrange(ggarrange(s_reg1, s_reg2, ncol = 2), 
@@ -318,14 +318,14 @@ barplot <- rgn_results %>%
   theme(panel.grid.minor = element_blank(),
         panel.grid.major.x = element_blank(),
         strip.background =element_rect(fill="gray22",color="gray22"),
-        strip.text = element_text(color = 'white',family="Franklin Gothic Book",size=12),
+        strip.text = element_text(color = 'white',family="sans",size=12),
         legend.position = "bottom",
         legend.text = element_text(size = 8),
         legend.key.size = unit(0.2, 'cm'), 
-        axis.text.x = element_text(color = "black",family="Franklin Gothic Book",size=8),
-        axis.text.y = element_text(color = "black",family="Franklin Gothic Book",size=12),
-        axis.title.x = element_text(color = "black",family="Franklin Gothic Book",size=12),
-        plot.title=element_text(family="Franklin Gothic Demi", size=16, hjust = -0.5)) 
+        axis.text.x = element_text(color = "black",family="sans",size=8),
+        axis.text.y = element_text(color = "black",family="sans",size=12),
+        axis.title.x = element_text(color = "black",family="sans",size=12),
+        plot.title=element_text(family="sans", size=16, hjust = -0.5)) 
 
 barplot_grob <- ggplotGrob(barplot)
 # grid.draw(barplot_grob)
@@ -408,12 +408,12 @@ s_f4 <- s_d %>%
     theme(panel.grid.minor = element_blank(),
           panel.grid.major.x = element_blank(),
           strip.background =element_rect(fill="gray22",color="gray22"),
-          strip.text = element_text(color = 'white',family="Franklin Gothic Book",size=12),
+          strip.text = element_text(color = 'white',family="sans",size=12),
           legend.position = "bottom",
-          axis.text.x = element_text(color = "black",family="Franklin Gothic Book",size=11),
-          axis.text.y = element_text(color = "black",family="Franklin Gothic Book",size=11),
-          axis.title.x = element_text(color = "black",family="Franklin Gothic Book",size=11),
-          plot.title=element_text(family="Franklin Gothic Demi", size=20)) 
+          axis.text.x = element_text(color = "black",family="sans",size=11),
+          axis.text.y = element_text(color = "black",family="sans",size=11),
+          axis.title.x = element_text(color = "black",family="sans",size=11),
+          plot.title=element_text(family="sans", size=20)) 
   
 
 w_f4 <- w_d %>%
@@ -432,12 +432,12 @@ w_f4 <- w_d %>%
   theme(panel.grid.minor = element_blank(),
         panel.grid.major.x = element_blank(),
         strip.background =element_rect(fill="gray22",color="gray22"),
-        strip.text = element_text(color = 'white',family="Franklin Gothic Book",size=12),
+        strip.text = element_text(color = 'white',family="sans",size=12),
         legend.position = "bottom",
-        axis.text.x = element_text(color = "black",family="Franklin Gothic Book",size=11),
-        axis.text.y = element_text(color = "black",family="Franklin Gothic Book",size=11),
-        axis.title.x = element_text(color = "black",family="Franklin Gothic Book",size=11),
-        plot.title=element_text(family="Franklin Gothic Demi", size=20))
+        axis.text.x = element_text(color = "black",family="sans",size=11),
+        axis.text.y = element_text(color = "black",family="sans",size=11),
+        axis.title.x = element_text(color = "black",family="sans",size=11),
+        plot.title=element_text(family="sans", size=20))
 
 
 s_panel_labels <- s_d %>%
@@ -572,15 +572,15 @@ ggsave("./fig/original/f4.png", f4, width = 12, height = 12)
 #   theme(panel.grid.minor = element_blank(),
 #         panel.grid.major.x = element_blank(),
 #         strip.background =element_rect(fill="gray22",color="gray22"),
-#         strip.text = element_text(color = 'white',family="Franklin Gothic Book",size=12),
+#         strip.text = element_text(color = 'white',family="sans",size=12),
 #         strip.text.y.left = element_text(angle = 0, size = 12, face = "bold"),
 #         strip.placement = "outside",
 #         legend.position = "bottom",
 #         axis.text.x = element_text(angle = 30, hjust = 1,
-#                                    color = "black",family="Franklin Gothic Book",size=11),
-#         axis.text.y = element_text(color = "black",family="Franklin Gothic Book",size=11),
-#         axis.title.x = element_text(color = "black",family="Franklin Gothic Book",size=11),
-#         plot.title=element_text(family="Franklin Gothic Demi", size=20))
+#                                    color = "black",family="sans",size=11),
+#         axis.text.y = element_text(color = "black",family="sans",size=11),
+#         axis.title.x = element_text(color = "black",family="sans",size=11),
+#         plot.title=element_text(family="sans", size=20))
 
 
 
