@@ -1,8 +1,10 @@
 source("./syntax/function.R")
 
 # ── Parallel workers ──────────────────────────────────────────────────────────
-# Use SLURM_CPUS_PER_TASK on HPC; fall back to half of local cores.
-n_workers <- as.integer(Sys.getenv("SLURM_CPUS_PER_TASK", unset = "0"))
+# LSF sets LSB_DJOB_NUMPROC; SLURM sets SLURM_CPUS_PER_TASK; fall back to
+# half of local cores when running interactively.
+n_workers <- as.integer(Sys.getenv("LSB_DJOB_NUMPROC",
+                          Sys.getenv("SLURM_CPUS_PER_TASK", unset = "0")))
 if (n_workers < 1L) n_workers <- max(1L, parallel::detectCores() %/% 2L)
 cl <- parallel::makeCluster(n_workers)
 doParallel::registerDoParallel(cl)
