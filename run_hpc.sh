@@ -16,13 +16,13 @@ mkdir -p "$RSCRIPT_ROOT/logs"
 cd "$RSCRIPT_ROOT"
 
 # ── Load R module (adjust version/name to your HPC module system) ─────────────
-module load R/4.4.0          # or: module load r/4.3.1, etc.
+module load R/4.4.0          # check available versions with: module avail R
 
 # ── Run pipeline ──────────────────────────────────────────────────────────────
 echo "Job started: $(date)"
 echo "Host: $(hostname)"
 echo "CPUs: $SLURM_CPUS_PER_TASK"
 
-Rscript run_all.R
+R --no-save --no-restore -f run_all.R
 
 echo "Job finished: $(date)"
