@@ -22,6 +22,13 @@ from ._geo import (GEODATA, base, distance, download, gisco_nuts, mask_base, ras
                    snap, unzip_member)
 
 PBF_URL = "https://download.geofabrik.de/europe/italy-latest.osm.pbf"
+DEM_URL = f"{GEODATA}/geodata/elv/ITA_elv_msk.zip"
+POP_URL = f"{GEODATA}/geodata/pop/gpw_v4_population_density_rev11_2020_30s.tif"
+WC_URL = f"{GEODATA}/climate/worldclim/2_1/base/wc2.1_30s_{{var}}.zip"
+LC_URL = f"{GEODATA}/geodata/landuse/WorldCover_{{var}}_30s.tif"
+LULC_MAP = {"lulc_forest": "trees", "lulc_shrubland": "shrubs", "lulc_grassland": "grassland",
+            "lulc_agricultural": "cropland", "lulc_developed": "built",
+            "lulc_sparselyvegetated": "bare", "lulc_riparian": "water"}
 
 
 def slope_deg(dem, res):
@@ -45,12 +52,14 @@ def run():
     cache = config.RAW
 
     print("1. Slope")
-    dem = snap(download(f"{GEODATA}/geodata/elv/ITA_elv_msk.tif", cache / "ITA_elv_msk.tif"))
+    dem_tif = cache / "elevation" / "ITA_elv_msk.tif"
+    if not dem_tif.exists():
+        unzip_member(download(DEM_URL, cache / "elevation" / "ITA_elv_msk.zip"), dem_tif.name, dem_tif)
+    dem = snap(dem_tif)
     save_var(mask_base(slope_deg(dem, g.res), b), "slope.tif", b)
 
     print("2. Population density")
-    pop = download(f"{GEODATA}/geodata/pop/gpw_v4_population_density_rev11_2020_30s.tif",
-                   cache / "gpw_v4_population_density_rev11_2020_30s.tif")
+    pop = download(POP_URL, cache / "population" / POP_URL.rsplit("/", 1)[1])
     save_var(snap(pop), "pop_density.tif", b)
 
     print("3. Roads distance (OSM)")
@@ -64,8 +73,8 @@ def run():
     d_tx = mask_base(distance(rasterize(tx, g), g), b)
     save_var(d_tx, "transmission_110_qgis.tif", b)
     save_var(d_tx, "transmission_110_wPlanned.tif", b)   # planned lines not in OSM: placeholder
-    sub_pts = osm("points", "other_tags LIKE '%\"power\"=>\"substation\"%'")
-    sub_poly = osm("multipolygons", "power = 'substation'")
+    sub_pts = osm("points", "other_tags LIKE '%\"power\"=>\"substation\"%'", ["other_tags"])
+    sub_poly = osm("multipolygons", "other_tags LIKE '%\"power\"=>\"substation\"%'", ["other_tags"])
     subs = pd.concat([sub_poly.geometry.centroid, sub_pts.geometry], ignore_index=True)
     d_sub = mask_base(distance(rasterize(gpd.GeoDataFrame(geometry=subs, crs=config.EPSG), g), g), b)
     save_var(d_sub, "substations_110_qgis.tif", b)
@@ -73,8 +82,7 @@ def run():
 
     print("4-5. Capacity-factor proxies (WorldClim srad / wind)")
     for var, out in (("srad", "solar_capacity.tif"), ("wind", "wind_capacity.tif")):
-        z = download(f"{GEODATA}/climate/worldclim/2_1/base/wc2.1_30s_{var}.zip",
-                     cache / "worldclim" / f"wc2.1_30s_{var}.zip")
+        z = download(WC_URL.format(var=var), cache / "worldclim" / f"wc2.1_30s_{var}.zip")
         months = []
         for m in range(1, 13):
             tif = cache / "worldclim" / f"wc2.1_30s_{var}_{m:02d}.tif"
@@ -84,12 +92,9 @@ def run():
         save_var(mask_base(np.nanmean(months, axis=0), b), out, b)
 
     print("6. Land use / land cover (ESA WorldCover fractions)")
-    lulc_map = {"lulc_forest": "trees", "lulc_shrubland": "shrubs", "lulc_grassland": "grassland",
-                "lulc_agricultural": "cropland", "lulc_developed": "built",
-                "lulc_sparselyvegetated": "bare", "lulc_riparian": "water"}
     stack = []
-    for out, var in lulc_map.items():
-        p = download(f"{GEODATA}/geodata/landuse/WorldCover_{var}_30s.tif", cache / f"WorldCover_{var}_30s.tif")
+    for out, var in LULC_MAP.items():
+        p = download(LC_URL.format(var=var), cache / "landuse" / f"WorldCover_{var}_30s.tif")
         lc = snap(p)
         save_var(lc, f"{out}.tif", b)
         stack.append(lc)

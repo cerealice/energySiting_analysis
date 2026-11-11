@@ -45,6 +45,10 @@ MAIN = [
 V = config.VAR_PATH
 SETUP = [
     ("make_base_raster", [config.BASE_RASTER]),
+    # tech must precede make_variables_italy: the spatial-lag layers are built from
+    # derived/<tech>_hull_existing.tif (R's run_setup() has this ordering gap).
+    ("tech", [config.DERIVED / "solar_hull_existing.tif", config.DERIVED / "wind_hull_existing.tif",
+              config.DERIVED / "solar_hull_existing.csv", config.DERIVED / "wind_hull_existing.csv"]),
     ("make_variables_italy", [V / f for f in ("slope.tif", "pop_density.tif",
                                               "transmission_110_qgis.tif", "roads_qgis.tif")]),
     ("make_socioeconomic", [V / f for f in ("svi_pov.tif", "svi_unemp.tif", "svi_foreignborn.tif")]),
@@ -79,11 +83,14 @@ def run_setup(force=False):
     for name, outputs in SETUP:
         if name == "download_worldtensor":
             probe = config.RAW / "worldtensor" / "climate" / "t2m_mean" / "2010.nc"
-            if probe.exists() and not force:
+            if probe.exists():          # never re-download (compute nodes are usually offline)
                 stamp("SKIP: download_worldtensor.py (probe files on disk)")
                 continue
-            subprocess.run([sys.executable, "syntax/download_worldtensor.py", "--workers", "2"],
-                           cwd=config.ROOT, check=False)
+            r = subprocess.run([sys.executable, "syntax/download_worldtensor.py", "--workers", "2"],
+                               cwd=config.ROOT, check=False)
+            if r.returncode != 0:
+                print("  WARNING: WorldTensor download failed (no internet on this node?). "
+                      "Run `python -m energysiting.setup.fetch` on a login node first.")
             continue
         if name == "stack":
             ok = False
@@ -99,7 +106,7 @@ def run_setup(force=False):
         elif outputs and not force and all(p.exists() for p in outputs):
             stamp(f"SKIP: {name} ({len(outputs)}/{len(outputs)} outputs exist)")
             continue
-        run_module(name, f"energysiting.setup.{name}")
+        run_module(name, "energysiting.tech" if name == "tech" else f"energysiting.setup.{name}")
 
 
 def main():
@@ -123,7 +130,9 @@ def main():
     elif a.start:
         steps = MAIN[[s[0] for s in MAIN].index(a.start):]
     for name, module, outputs in steps:
-        if outputs and not a.only and all(p.exists() for p in outputs):
+        if name == "tech" and (a.setup or a.force_setup):
+            continue                      # already handled inside the setup sequence
+        if outputs and not a.only and not a.force_setup and all(p.exists() for p in outputs):
             stamp(f"SKIP: {name} (outputs exist)")
             continue
         run_module(name, module)

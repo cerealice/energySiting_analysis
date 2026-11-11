@@ -199,7 +199,7 @@ def read(path, names=None, cache=True) -> Raster:
     else:
         if HAVE_RASTERIO:
             with rasterio.open(path) as src:
-                arr = src.read(masked=True).filled(np.nan).astype(np.float32)
+                arr = src.read(masked=True).astype(np.float32).filled(np.nan)
                 t = src.transform
                 grid = Grid(t.c, t.f, t.a, src.height, src.width, src.crs.to_epsg() or 3035)
                 nm = [d or f"band{i + 1}" for i, d in enumerate(src.descriptions)]

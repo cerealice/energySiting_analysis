@@ -24,7 +24,8 @@ The R code is left untouched next to it so the two can be compared.
 | `spatial_cv.R` | `spatial_cv.py` | variogram range, spatial blocks, GBM/RF re-fit |
 | `data.R` | `data.py` + `glmm.py` | masked maps, NUTS-1 means, random-slope GLMM |
 | `plot.R` | `plot.py` | figures f1–f4 |
-| `run_all.R`, `run_hpc.sh` | `run_all.py`, `run_hpc.sh` | runner (same skip-if-exists logic) |
+| `run_all.R`, `run_hpc.sh` | `run_all.py`, `run_all.sh` | runner (same skip-if-exists logic); cluster script |
+| – | `setup/fetch.py` | downloads every raw input up front (for offline compute nodes) |
 
 ## Model mapping (caret → scikit-learn)
 
@@ -45,21 +46,45 @@ stratified folds, so the model comparison is paired.
 
 ## Running
 
+### On a cluster (LSF or SLURM) — full rebuild from raw data
+
+```bash
+git checkout python-sklearn
+bash python/run_all.sh check      # what is still missing (Natura 2000 is manual)
+bash python/run_all.sh            # login node: create env + download inputs + submit job
+```
+
+`run_all.sh` creates a venv (or a conda env with `CONDA_ENV=energysiting`),
+downloads everything the setup needs (~17 GB; resumable) with
+`python -m energysiting.setup.fetch`, then submits itself with `bsub` or
+`sbatch`. The job runs `python python/run_all.py --force-setup`, i.e. it
+rebuilds the base raster, every covariate layer, the 102-layer stack, the
+presence/absence data, all models and figures — fully offline. Edit the
+`#BSUB` / `#SBATCH` lines (queue, project, walltime) and, if needed, set
+`PY_MODULE` (e.g. `python/3.11`). Sub-commands: `prepare`, `submit`, `check`, `local`.
+
+The only manual input is EEA Natura 2000 end-2024 (EPSG:3035), unzipped to
+`data/raw_downloads/eea_v_3035_100_k_natura2000_p_2024_v01_r00/SHP/Natura2000_end2024_epsg3035.shp`.
+
+### Directly
+
 ```bash
 pip install -r python/requirements.txt
-python python/run_all.py              # absence → plot, re-using derived/*covStack.tif from setup
-python python/run_all.py --setup      # also build every input layer (needs rasterio/geopandas)
+python python/run_all.py --setup      # build missing inputs, then the analysis
+python python/run_all.py              # analysis only, re-using derived/*covStack.tif
 python python/run_all.py --from modeling
 ```
 
-Inputs shared with R (`derived/covStack.tif`, `*_covStack.tif`, `future.tif`,
-`*_hull_existing*`) are read from `derived/`; everything the Python analysis
-produces goes to `derived/py/` and `fig/python/` so R results are never overwritten.
+Shared inputs (`derived/covStack.tif`, `*_covStack.tif`, `future.tif`,
+`*_hull_existing*`, `data/processed_data/`) use the same file names as the R
+pipeline; everything the Python analysis produces goes to `derived/py/` and
+`fig/python/`.
 
 The analysis steps need only numpy/pandas/scipy/scikit-learn/matplotlib/tifffile:
 if `rasterio` is missing, GeoTIFFs (including terra's LZW-compressed ones) are
 read by a pure-Python fallback in `energysiting/raster.py`. The setup steps and
-`tech.py` require the usual geospatial stack (rasterio, geopandas, pyogrio).
+`tech.py` require the geospatial stack (rasterio, geopandas, pyogrio with GDAL's
+OSM driver, xarray + netCDF4).
 
 ## Deliberate differences from the R code
 
@@ -68,6 +93,9 @@ read by a pure-Python fallback in `energysiting/raster.py`. The setup steps and
   all `pred_*.tif` / `results_masked.tif` written by R are entirely NA (f3 shows
   grey maps and empty bars). The Python port imputes prediction cells exactly
   like the training data (`impute_dat`: LUH3 → 0, others → training median).
+* `tech` runs before `make_variables_italy` in the setup: the spatial-lag
+  layers are computed from the presence rasters, which R's `run_setup()` builds
+  only later (it works in R only when `derived/` already exists).
 * Random number streams differ from R, so pseudo-absences, folds and stochastic
   learners are not bit-identical; presence covariates match R to 1e-14.
 * RF importance: permutation importance (presence-class recall) instead of

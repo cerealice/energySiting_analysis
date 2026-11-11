@@ -5,7 +5,6 @@ pyproj, requests (and xarray + netCDF4 for make_worldtensor).
 """
 from __future__ import annotations
 
-import io
 import zipfile
 from pathlib import Path
 
@@ -77,8 +76,12 @@ def transform_of(grid):
 
 
 def rasterize(gdf, grid, value=1.0, field=None, touches=False, fill=np.nan):
-    shapes = ((geom, (row[field] if field else value)) for geom, (_, row) in
-              zip(gdf.geometry, gdf.iterrows())) if field else ((g, value) for g in gdf.geometry)
+    ok = gdf.geometry.notna() & ~gdf.geometry.is_empty
+    gdf = gdf[ok]
+    vals = gdf[field].astype(float) if field else [value] * len(gdf)
+    shapes = list(zip(gdf.geometry, vals))
+    if not shapes:
+        return np.full(grid.shape, fill, dtype="float64")
     return features.rasterize(shapes, out_shape=grid.shape, transform=transform_of(grid),
                               fill=fill, all_touched=touches, dtype="float64")
 
@@ -126,7 +129,12 @@ def save_var(arr, name, b=None):
 
 
 def unzip_member(zip_path, member, dest):
+    """Extract one member (searched by base name) without loading it into memory."""
+    import shutil
+    dest = Path(dest)
+    dest.parent.mkdir(parents=True, exist_ok=True)
     with zipfile.ZipFile(zip_path) as z:
-        with z.open(member) as src, open(dest, "wb") as out:
-            out.write(src.read())
+        name = next(n for n in z.namelist() if n.rsplit("/", 1)[-1] == member)
+        with z.open(name) as src, open(dest, "wb") as out:
+            shutil.copyfileobj(src, out, 1 << 24)
     return dest

@@ -46,6 +46,8 @@ def rse_shapefile(name):
 def run_tech(tech, regions, b):
     s = SPEC[tech]
     raw = pd.read_excel(config.DATA / s["xlsx"], sheet_name=s["sheet"])
+    for col in ("Latitude", "Longitude", "Capacity (MW)", "Start year"):
+        raw[col] = pd.to_numeric(raw[col], errors="coerce")
     raw = raw[(raw["Country/Area"] == "Italy") & s["filt"](raw) & (raw["Status"] == "operating")
               & raw.Latitude.notna() & raw.Longitude.notna()]
     sf = gpd.GeoDataFrame(raw, geometry=gpd.points_from_xy(raw.Longitude, raw.Latitude),
@@ -66,6 +68,7 @@ def run_tech(tech, regions, b):
 
     # RSE Atlante municipal capacity
     rse = gpd.read_file(rse_shapefile(s["rse"]))
+    rse["VALORE"] = pd.to_numeric(rse["VALORE"], errors="coerce")
     rse = rse[rse["VALORE"] >= 1].to_crs(config.EPSG)
     rse["geometry"] = rse.geometry.centroid
     rse = gpd.sjoin(rse, regions[["NUTS_NAME", "geometry"]], predicate="within", how="left") \

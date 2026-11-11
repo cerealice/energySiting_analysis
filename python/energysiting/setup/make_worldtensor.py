@@ -19,30 +19,54 @@ LUH3 = ["primf", "primn", "secdf", "secdn", "pastr", "range", "urban",
         "c3ann", "c4ann", "c3per", "c4per", "c3nfx"]
 
 
+def orient(arr, lon, lat):
+    """(layers, lat, lon) array → north-up, longitudes in [-180, 180), cropped to BBOX."""
+    arr = np.asarray(arr, dtype="float64")
+    if arr.ndim == 2:
+        arr = arr[None]
+    lon = np.asarray(lon, dtype="float64")
+    lat = np.asarray(lat, dtype="float64")
+    if lon.max() > 180:
+        lon = ((lon + 180) % 360) - 180
+    oi = np.argsort(lon, kind="stable")
+    li = np.argsort(-lat, kind="stable")
+    lon, lat, arr = lon[oi], lat[li], arr[:, li][:, :, oi]
+    mx = (lon >= BBOX[0]) & (lon <= BBOX[1])
+    my = (lat >= BBOX[2]) & (lat <= BBOX[3])
+    return arr[:, my][:, :, mx], lon[mx], lat[my]
+
+
 def read_nc(path):
-    ds = xr.open_dataset(path)
-    da = ds[list(ds.data_vars)[0]].squeeze(drop=True)
-    lon = "lon" if "lon" in da.dims else "longitude"
-    lat = "lat" if "lat" in da.dims else "latitude"
-    da = da.sortby(lat, ascending=False)
-    da = da.sel({lon: slice(BBOX[0], BBOX[1]), lat: slice(BBOX[3], BBOX[2])})
-    return da.values.astype("float64"), da[lon].values, da[lat].values
+    """All layers of the first gridded variable (time steps kept as layers,
+    like terra::rast on a multi-layer NetCDF)."""
+    ds = xr.open_dataset(path, decode_times=False)
+    name = next(v for v in ds.data_vars if ds[v].ndim >= 2)
+    da = ds[name]
+    latn = next(d for d in da.dims if d.lower().startswith("lat") or d == "y")
+    lonn = next(d for d in da.dims if d.lower().startswith("lon") or d == "x")
+    other = [d for d in da.dims if d not in (latn, lonn)]
+    da = da.transpose(*other, latn, lonn)
+    vals = da.values.reshape(-1, da.sizes[latn], da.sizes[lonn])
+    out = orient(vals, da[lonn].values, da[latn].values)
+    ds.close()
+    return out
 
 
-def to_grid(arr, lons, lats, b):
+def to_grid(arr2d, lons, lats, b):
     dx, dy = abs(lons[1] - lons[0]), abs(lats[1] - lats[0])
     tr = from_bounds(lons.min() - dx / 2, lats.min() - dy / 2, lons.max() + dx / 2, lats.max() + dy / 2,
-                     arr.shape[-1], arr.shape[-2])
-    return snap_array(arr, tr, "EPSG:4326", "bilinear", b)
+                     arr2d.shape[-1], arr2d.shape[-2])
+    return snap_array(arr2d, tr, "EPSG:4326", "bilinear", b)
 
 
 def years_stack(domain, var, years, b):
+    """Every layer of every year, snapped to the base grid → (layers, rows, cols)."""
     out = []
     for y in years:
         p = WT / domain / var / f"{y}.nc"
         if p.exists():
             a, lo, la = read_nc(p)
-            out.append(to_grid(a, lo, la, b))
+            out.extend(to_grid(layer, lo, la, b) for layer in a)
     if not out:
         raise FileNotFoundError(f"No files for {domain}/{var}")
     return np.stack(out)
@@ -68,7 +92,7 @@ def run():
     for v in ERA5:
         safe_write(f"era5_{v}.tif", lambda v=v: np.nanmean(years_stack("climate", v, yrs, b), 0), b)
     for v in LUH3:
-        safe_write(f"luh3_{v}.tif", lambda v=v: years_stack("land_use/states", v, [2020], b)[0], b, na_fill=0)
+        safe_write(f"luh3_{v}.tif", lambda v=v: np.nanmean(years_stack("land_use/states", v, [2020], b), 0), b, na_fill=0)
     safe_write("wt_ndvi_mean.tif",
                lambda: np.nanmean(years_stack("vegetation", "ndvi_mean", range(2003, 2021), b), 0), b)
 
