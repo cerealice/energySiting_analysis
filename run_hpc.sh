@@ -29,15 +29,10 @@ if ! command -v R &>/dev/null; then
 fi
 
 # ── User R library (system library is read-only) ──────────────────────────────
+# Packages must be pre-installed from a login node:
+#   R --no-save --no-restore -f install_packages.R
 export R_LIBS_USER="$HOME/R/x86_64-pc-linux-gnu-library/4.4"
 mkdir -p "$R_LIBS_USER"
-
-# Install librarian on first run (librarian then installs everything else)
-R --no-save --no-restore -e "
-  if (!requireNamespace('librarian', quietly = TRUE))
-    install.packages('librarian', lib = Sys.getenv('R_LIBS_USER'),
-                     repos = 'https://cloud.r-project.org')
-"
 
 # ── Run pipeline ──────────────────────────────────────────────────────────────
 echo "Job started: $(date)"

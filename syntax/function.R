@@ -1,7 +1,6 @@
-if (!require(librarian)){
-  install.packages("librarian")
-  library(librarian)
-}
+if (!requireNamespace("librarian", quietly = TRUE))
+  stop("Package 'librarian' is not installed. Run install_packages.R from a node with internet access first.")
+library(librarian)
 
 librarian::shelf("raster", "sf", "tidyverse", "terra", "here", "tictoc", "foreach", "doParallel", "foreign", "dplyr",
                  "readxl", "giscoR",
