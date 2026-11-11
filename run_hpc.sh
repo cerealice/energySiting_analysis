@@ -18,13 +18,21 @@ export RSCRIPT_ROOT=/path/to/energySiting_analysis_Italy
 mkdir -p "$RSCRIPT_ROOT/logs"
 cd "$RSCRIPT_ROOT"
 
-# ── Load R module (adjust version/name to your HPC module system) ─────────────
-module load R/4.4.0          # check available versions with: module avail R
+# ── Load R module ─────────────────────────────────────────────────────────────
+# Find the right name with:  module avail R
+module load R/4.4.0
+
+# Fail fast with a clear message if R is not on PATH after the module load
+if ! command -v R &>/dev/null; then
+  echo "ERROR: R not found after module load. Run 'module avail R' to find the correct module name." >&2
+  exit 1
+fi
 
 # ── Run pipeline ──────────────────────────────────────────────────────────────
 echo "Job started: $(date)"
 echo "Host: $(hostname)"
 echo "CPUs: $LSB_DJOB_NUMPROC"
+echo "R:    $(R --version | head -1)"
 
 R --no-save --no-restore -f run_all.R
 
