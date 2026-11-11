@@ -20,7 +20,7 @@ cd "$RSCRIPT_ROOT"
 
 # ── Load R module ─────────────────────────────────────────────────────────────
 # Find the right name with:  module avail R
-module load R/4.4.0
+module load R-gcc/4.4.3
 
 # Fail fast with a clear message if R is not on PATH after the module load
 if ! command -v R &>/dev/null; then
