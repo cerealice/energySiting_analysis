@@ -21,134 +21,79 @@ This is a fork of the original US-focused analysis, adapted for Italy. The model
 
 ### Included in this repository (`data/`)
 
+Small files committed to git; no manual download needed if you clone the repo.
+
 | File | Description | Source |
 |---|---|---|
-| `Global-Solar-Power-Tracker-February-2026.xlsx` | Utility-scale solar plants ≥1 MW — Italy subset used | [Global Energy Monitor](https://globalenergymonitor.org/projects/global-solar-power-tracker/) |
-| `Global-Wind-Power-Tracker-February-2026.xlsx` | Onshore wind farms ≥10 MW — Italy subset used | [Global Energy Monitor](https://globalenergymonitor.org/projects/global-wind-power-tracker/) |
+| `data/Global-Solar-Power-Tracker-February-2026.xlsx` | Utility-scale solar plants ≥ 1 MW — Italy subset used | [Global Energy Monitor — Global Solar Power Tracker](https://globalenergymonitor.org/projects/global-solar-power-tracker/) |
+| `data/Global-Wind-Power-Tracker-February-2026.xlsx` | Onshore wind farms ≥ 10 MW — Italy subset used | [Global Energy Monitor — Global Wind Power Tracker](https://globalenergymonitor.org/projects/global-wind-power-tracker/) |
+| `data/raw_downloads/Redditi_e_principali_variabili_IRPEF_su_base_comunale_CSV_2024.csv` | Municipal mean taxable income (IRPEF 2022) — poverty proxy | [MEF — Dipartimento delle Finanze, Statistiche fiscali](https://www.finanze.gov.it/it/statistiche-fiscali/) |
+| `data/raw_downloads/Dati provinciali (IT1,151_914_DF_DCCV_TAXDISOCCU1_8,1.0).csv` | Provincial unemployment rates — ISTAT I.Stat DataWarehouse | [ISTAT I.Stat — DCCV_TAXDISOCCU1](https://esploradati.istat.it/) |
+| `data/raw_downloads/Popolazione per paese di nascita - comuni (IT1,DF_DCSS_HCUE_COM_3_COM,1.0).csv` | Municipal foreign-born population — ISTAT I.Stat DataWarehouse | [ISTAT I.Stat — DCSS_HCUE_COM_3_COM](https://esploradati.istat.it/) |
+| `data/raw_downloads/NUTS_3_DATA.csv` | NUTS-3 GDP per capita and institutional quality index | [Zenodo DOI 10.5281/zenodo.11121790](https://doi.org/10.5281/zenodo.11121790) — Cortinovis et al. (2025), *Scientific Data* |
 
-### Downloaded at runtime (no manual download needed)
+### Downloaded automatically at runtime
 
-| Data | Package / API | Used in |
+These are fetched by R packages or the Python script on first run; no action needed.
+
+| Data | How downloaded | Used in |
 |---|---|---|
-| Italian NUTS-2 regional boundaries | `giscoR::gisco_get_nuts()` — Eurostat | `function.R`, `absence.R` |
-| Italian national boundary polygon | `osmdata` — OpenStreetMap relation 365331 | `make_base_raster.R` |
+| Italian NUTS-2/3 boundaries | `giscoR::gisco_get_nuts()` — Eurostat | `function.R`, `make_socioeconomic.R` |
+| Italian commune boundaries | `giscoR::gisco_get_communes()` | `make_socioeconomic.R` |
+| SRTM 30 arc-sec DEM | `geodata::elevation_30s(country = "ITA")` | `make_variables_italy.R` |
+| WorldPop 2020 population density | `geodata::population(year = 2020, res = 0.5)` | `make_variables_italy.R` |
+| OSM road & power grid (Italy PBF, ~1.5 GB) | `osmextract::oe_get("Italy")` | `make_variables_italy.R` |
+| WorldClim 2.1 BIO1–BIO19 (1 km) | `geodata` inside `make_worldclim.R` | `make_worldclim.R` |
+| ERA5, LUH3, NDVI NetCDFs (WorldTensor) | `syntax/download_worldtensor.py` | `make_worldtensor.R` |
 
-### To be provided (predictor raster layers)
+### Requires manual download (too large for git)
 
-The following raster layers must be placed in `data/processed_data/` before running `stack.R`. These are the Italian equivalents of the predictor layers used in the US analysis:
+Download once and place in the directory shown.
 
-| Layer | Italian source |
-|---|---|
-| Transmission lines distance | TERNA (open GIS data) |
-| Substation distance | TERNA |
-| Road distance | OpenStreetMap |
-| Population density | ISTAT / GHSL |
-| Socioeconomic vulnerability | ISTAT census indicators |
-| Land use / land cover | Copernicus CORINE Land Cover |
-| Solar capacity factor | PVGIS (JRC) |
-| Wind capacity factor | PVGIS / Copernicus CDS |
-| Terrain slope | EU-DEM or SRTM |
-| Environmental impact score | Natura 2000 + national protected areas |
-| Suitability masks (solar, wind) | Derived from the above |
+| Data | Size | Download | Place at |
+|---|---|---|---|
+| EEA Natura 2000 — end-2024 (EPSG:3035) | ~2.4 GB | [EEA DataHub — Natura 2000 spatial data](https://www.eea.europa.eu/en/datahub/datahubitem-view/6fc8ad2d-195d-40f4-bdec-576e7d1268b4) | `data/raw_downloads/eea_v_3035_100_k_natura2000_p_2024_v01_r00/` |
 
 ---
 
-## How to run the analysis
+## How to run
 
-Run the scripts **in the order listed below**. All paths are relative to the project root, so open the project via `energySiting.Rproj` first — this sets the working directory correctly. An internet connection is required for step 1 (OSM boundary) and for the first run of any script (packages are installed automatically by `librarian` on first use).
+### On a local machine
 
-### 1. Build the Italian base raster (run once)
-
-This creates the 1 km grid at EPSG:3035 that all subsequent rasters snap to. It fetches Italy's national boundary from Eurostat via `giscoR` (the same source used for the regional boundaries).
+Open the project via `energySiting.Rproj` (sets working directory), then in R:
 
 ```r
-source("syntax/make_base_raster.R")
-# Output: data/processed_data/masks/Italy_base_raster.tif
+# One-time setup: build rasters, download large files, assemble covariate stack
+run_setup()          # skips steps whose outputs already exist
+
+# Main analysis (presence/absence modelling, figures)
+source("run_all.R")
 ```
 
-An OpenStreetMap alternative is included in the script as a comment, but the Overpass API can time out — use the `giscoR` default.
+`run_all.R` sources both — just `source("run_all.R")` runs the full pipeline. Steps are skipped automatically if their outputs are already on disk.
 
-### 2. Process plant location data
+### On an HPC cluster (SLURM)
 
-Reads the GEM tracker Excel files, assigns NUTS-2 regions via spatial join, and rasterizes presence locations and masks.
+**1. Install R packages** (run on a compute node, not the login node):
 
-```r
-source("syntax/tech.R")
-# Outputs: derived/solar_hull_existing.tif, derived/solar_hull_existing_mask.tif
-#          derived/wind_hull_existing.tif,  derived/wind_hull_existing_mask.tif
-#          derived/solar_hull_existing.csv, derived/wind_hull_existing.csv
-#          derived/location.RData
+```bash
+sbatch run_setup.sh   # or submit an interactive job and run:
+# R --no-save --no-restore -e "source('syntax/function.R')"
 ```
 
-### 3. Sample pseudo-absence locations
+**2. Set the project path** in `run_hpc.sh`:
 
-Draws pseudo-absence points stratified by Italian region, excluding existing plant sites and unsuitable areas.
-
-```r
-source("syntax/absence.R")
-# Output: derived/absence.RData
+```bash
+export RSCRIPT_ROOT=/path/to/energySiting_analysis_Italy
 ```
 
-### 4. Build predictor stack
+**3. Submit the main pipeline**:
 
-Combines all predictor raster layers into a single stack. Requires the Italian predictor rasters in `data/processed_data/variables/`.
-
-Run `make_variables_italy.R` to download and process the real Italian predictor data. Most variables are fully automated; three require manual downloads (instructions are printed at the end of the script):
-
-| Variable group | Source | Automated? |
-|---|---|---|
-| Slope | SRTM via `geodata` | Yes |
-| Population density | WorldPop 2020 via `geodata` | Yes |
-| Distance to roads | OpenStreetMap via `osmextract` (~1.5 GB) | Yes |
-| Solar capacity factor | WorldClim srad via `geodata` (replace with PVGIS for production) | Yes |
-| Wind capacity factor | WorldClim wind via `geodata` (replace with ERA5/CDS for production) | Yes |
-| Land use / land cover | ESA WorldCover 2021 via `geodata` | Yes |
-| NUTS-1 region dummies | Eurostat via `giscoR` | Yes |
-| Spatial lag | Computed from GEM tracker plant rasters | Yes |
-| FER incentive zone | National binary (all Italy = 1) until GSE zone data available | Yes |
-| Environmental impact score | Slope-only until Natura 2000 added | Partial |
-| Transmission & substations | TERNA GIS portal | Manual |
-| Socioeconomic indicators | ISTAT census data explorer | Manual |
-| Natura 2000 proximity | EEA Natura 2000 shapefile | Manual |
-
-```r
-source("syntax/make_variables_italy.R")
+```bash
+sbatch run_hpc.sh
 ```
 
-If real data is not yet available and you only need to test the pipeline, use the placeholder script instead:
-
-```r
-source("syntax/make_placeholder_variables.R")   # pipeline testing only
-```
-
-Then build the stack:
-
-```r
-source("syntax/stack.R")
-```
-
-### 5. Extract predictor values
-
-Runs zonal statistics to extract predictor values at each presence and pseudo-absence location.
-
-```r
-source("syntax/zonal.R")
-```
-
-### 6. Run models
-
-Fits GLM, Lasso, Random Forest, and XGBoost models and generates probability surfaces.
-
-```r
-source("syntax/modeling.R")
-```
-
-### 7. Analyse and plot
-
-```r
-source("syntax/data.R")
-source("syntax/plot.R")
-```
+The job requests 16 CPUs and 64 GB RAM (adjust `--cpus-per-task` and `--mem` to your allocation). `modeling.R` uses all available CPUs via `doParallel`.
 
 ---
 
@@ -157,30 +102,37 @@ source("syntax/plot.R")
 ```
 .
 ├── data/
-│   ├── Global-Solar-Power-Tracker-February-2026.xlsx
-│   ├── Global-Wind-Power-Tracker-February-2026.xlsx
-│   └── processed_data/
-│       ├── masks/
-│       │   ├── Italy_base_raster.tif        (generated by make_base_raster.R)
-│       │   ├── solar_suitability_SL1.tif    (to be provided)
-│       │   └── wind_suitability_SL1.tif     (to be provided)
-│       └── variables/
-│           └── ... (predictor raster layers, to be provided)
+│   ├── Global-Solar-Power-Tracker-February-2026.xlsx  ← GEM, committed
+│   ├── Global-Wind-Power-Tracker-February-2026.xlsx   ← GEM, committed
+│   └── raw_downloads/
+│       ├── NUTS_3_DATA.csv                            ← Zenodo, committed
+│       ├── Redditi_e_principali_variabili_IRPEF_su_base_comunale_CSV_2024.csv  ← MEF, committed
+│       ├── Dati provinciali (...TAXDISOCCU...).csv    ← ISTAT, committed
+│       ├── Popolazione per paese di nascita (...).csv ← ISTAT, committed
+│       └── eea_v_3035_.../                            ← EEA Natura 2000, manual download (2.4 GB)
 │
 ├── syntax/
-│   ├── function.R          — package loading, CRS, Italian regional boundaries
-│   ├── make_base_raster.R  — creates Italy_base_raster.tif from OSM
-│   ├── tech.R              — processes GEM tracker data, rasterizes plants
-│   ├── absence.R           — pseudo-absence sampling by Italian region
-│   ├── stack.R             — builds predictor raster stack
-│   ├── zonal.R             — extracts predictor values at plant locations
-│   ├── modeling.R          — GLM, Lasso, RF, XGBoost models
-│   ├── data.R              — post-model analysis and statistics
-│   └── plot.R              — figures
+│   ├── function.R              — package loading, CRS, regional boundaries
+│   ├── make_base_raster.R      — Italy_base_raster.tif (1 km EPSG:3035 grid)
+│   ├── make_variables_italy.R  — slope, population, roads, transmission (OSM)
+│   ├── make_socioeconomic.R    — poverty, unemployment, foreignborn rasters (ISTAT)
+│   ├── make_zenodo_socioeconomic.R — GDP pc, institutional quality (Zenodo)
+│   ├── make_natura2000.R       — environmental impact score (Natura 2000 + slope)
+│   ├── make_nuts2_regions.R    — NUTS-2 binary indicator rasters
+│   ├── make_worldtensor.R      — ERA5, LUH3, NDVI rasters from WorldTensor NetCDFs
+│   ├── make_worldclim.R        — WorldClim BIO1–BIO19 rasters
+│   ├── download_worldtensor.py — downloads WorldTensor NetCDF files
+│   ├── stack.R                 — assembles 102-layer covariate stack
+│   ├── tech.R                  — processes GEM tracker data, rasterizes plants
+│   ├── absence.R               — pseudo-absence sampling by Italian region
+│   ├── zonal.R                 — extracts covariate values at presence/absence sites
+│   ├── modeling.R              — GLM, Lasso, RF, XGBoost + suitability maps
+│   ├── spatial_cv.R            — spatial block cross-validation
+│   ├── performance.R           — model comparison table and plots
+│   ├── data.R                  — regional summaries, GLMM
+│   └── plot.R                  — figures f1–f4
 │
-├── derived/
-│   └── ... (intermediate outputs, generated at runtime)
-│
-└── fig/
-    └── ... (output figures)
+├── run_all.R      — full pipeline runner (source this to run everything)
+├── run_hpc.sh     — SLURM job script
+└── derived/       — intermediate outputs (generated at runtime, not committed)
 ```
