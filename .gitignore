@@ -19,6 +19,8 @@ data/raw_downloads/*.gpkg
 data/raw_downloads/*.pbf
 data/raw_downloads/*.osm
 data/raw_downloads/*.zip
+!data/raw_downloads/d__temp_fv_pot_comunale_2021.zip
+!data/raw_downloads/d__temp_eo_pot_comunale_2019.zip
 data/raw_downloads/*.7z
 data/raw_downloads/*.nc
 data/raw_downloads/*.shp

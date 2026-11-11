@@ -44,6 +44,24 @@ solar_locations <- solar_sf %>%
          radius_m  = sqrt(area_m2 / pi))
 
 
+# ── Unzip RSE shapefiles on first run ────────────────────────────────────────
+rse_solar_shp <- "./data/raw_downloads/rse_atlante/fv_pot_comunale_2021/fv_pot_comunale_2021.shp"
+rse_wind_shp  <- "./data/raw_downloads/rse_atlante/eo_pot_comunale_2019/eo_pot_comunale_2019.shp"
+
+if (!file.exists(rse_solar_shp)) {
+  message("Extracting RSE solar shapefile...")
+  dir.create(dirname(rse_solar_shp), recursive = TRUE, showWarnings = FALSE)
+  unzip("./data/raw_downloads/d__temp_fv_pot_comunale_2021.zip",
+        exdir = dirname(rse_solar_shp))
+}
+if (!file.exists(rse_wind_shp)) {
+  message("Extracting RSE wind shapefile...")
+  dir.create(dirname(rse_wind_shp), recursive = TRUE, showWarnings = FALSE)
+  unzip("./data/raw_downloads/d__temp_eo_pot_comunale_2019.zip",
+        exdir = dirname(rse_wind_shp))
+}
+
+
 # ── SOLAR: Enrich with RSE Atlante Integrato (fv_pot_comunale_2021) ──────────
 # RSE provides total installed ground-mounted PV capacity (MW) per municipality
 # as of 2021. SOURCE FILTER (applied by RSE before publication): only plants
@@ -52,9 +70,7 @@ solar_locations <- solar_sf %>%
 # installations are still active in 2026.
 # Threshold: >= 1 MW municipal total to match GSPT's per-plant minimum.
 
-rse_solar_raw <- st_read(
-  "./data/d__temp_fv_pot_comunale_2021/fv_pot_comunale_2021.shp", quiet = TRUE
-) %>%
+rse_solar_raw <- st_read(rse_solar_shp, quiet = TRUE) %>%
   filter(VALORE >= 1) %>%
   st_transform(italy_crs) %>%
   st_centroid() %>%
@@ -93,8 +109,7 @@ solar_locations <- bind_rows(
     mutate(unique_id = nrow(solar_locations) + row_number())
 )
 
-message("Solar locations total: ", nrow(solar_locations),
-        " (GSPT + RSE Atlante)")
+message("Solar locations total: ", nrow(solar_locations), " (GSPT + RSE Atlante)")
 
 
 # ── Rasterize solar ───────────────────────────────────────────────────────────
@@ -163,9 +178,7 @@ wind_locations <- wind_sf %>%
 # Wind turbines have 20–25 yr lifetimes — 2019 installations still active 2026.
 # Threshold: >= 1 MW per comune to filter any residual micro-wind entries.
 
-rse_wind_raw <- st_read(
-  "./data/d__temp_eo_pot_comunale_2019/eo_pot_comunale_2019.shp", quiet = TRUE
-) %>%
+rse_wind_raw <- st_read(rse_wind_shp, quiet = TRUE) %>%
   filter(VALORE >= 1) %>%
   st_transform(italy_crs) %>%
   st_centroid() %>%
@@ -205,8 +218,7 @@ wind_locations <- bind_rows(
     mutate(unique_id = nrow(wind_locations) + row_number())
 )
 
-message("Wind locations total: ", nrow(wind_locations),
-        " (GWPT + RSE Atlante)")
+message("Wind locations total: ", nrow(wind_locations), " (GWPT + RSE Atlante)")
 
 
 # ── Rasterize wind ────────────────────────────────────────────────────────────

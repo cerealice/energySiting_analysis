@@ -31,6 +31,8 @@ Small files committed to git; no manual download needed if you clone the repo.
 | `data/raw_downloads/Dati provinciali (IT1,151_914_DF_DCCV_TAXDISOCCU1_8,1.0).csv` | Provincial unemployment rates — ISTAT I.Stat DataWarehouse | [ISTAT I.Stat — DCCV_TAXDISOCCU1](https://esploradati.istat.it/) |
 | `data/raw_downloads/Popolazione per paese di nascita - comuni (IT1,DF_DCSS_HCUE_COM_3_COM,1.0).csv` | Municipal foreign-born population — ISTAT I.Stat DataWarehouse | [ISTAT I.Stat — DCSS_HCUE_COM_3_COM](https://esploradati.istat.it/) |
 | `data/raw_downloads/NUTS_3_DATA.csv` | NUTS-3 GDP per capita and institutional quality index | [Zenodo DOI 10.5281/zenodo.11121790](https://doi.org/10.5281/zenodo.11121790) — Cortinovis et al. (2025), *Scientific Data* |
+| `data/raw_downloads/rse_atlante/fv_pot_comunale_2021/` | Installed ground-mounted PV capacity (MW) per municipality, 2021 — plants > 100 kW | [RSE Atlante Integrato delle Energie Rinnovabili](https://www.atlante.rse-web.it/) |
+| `data/raw_downloads/rse_atlante/eo_pot_comunale_2019/` | Installed wind capacity (MW) per municipality, 2019 | [RSE Atlante Integrato delle Energie Rinnovabili](https://www.atlante.rse-web.it/) |
 
 ### Downloaded automatically at runtime
 
