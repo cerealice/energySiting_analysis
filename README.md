@@ -1,3 +1,6 @@
+> **Branch `python-sklearn`** — this branch adds a full Python / scikit-learn port of the
+> pipeline in [`python/`](python/README.md) (`python python/run_all.py`). The R code below is unchanged.
+
 # Analyzing siting trends of utility-scale solar and wind — Italy
 
 This is a fork of the original US-focused analysis, adapted for Italy. The modelling framework is identical; the changes concern input data sources, coordinate reference system, and administrative geography.

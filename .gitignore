@@ -34,3 +34,6 @@ data/raw_downloads/wc2*/
 data/raw_downloads/srtm*/
 data/raw_downloads/worldtensor/
 data/raw_downloads/worldclim/
+# Python port
+__pycache__/
+*.pyc
