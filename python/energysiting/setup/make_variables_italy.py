@@ -11,6 +11,8 @@ Downloads mirror the R ``geodata`` / ``osmextract`` sources:
 """
 from __future__ import annotations
 
+import warnings
+
 import numpy as np
 import pandas as pd
 import geopandas as gpd
@@ -89,7 +91,9 @@ def run():
             if not tif.exists():
                 unzip_member(z, tif.name, tif)
             months.append(snap(tif))
-        save_var(mask_base(np.nanmean(months, axis=0), b), out, b)
+        with np.errstate(invalid="ignore"), warnings.catch_warnings():
+            warnings.simplefilter("ignore", RuntimeWarning)   # cells NA in all 12 months stay NA
+            save_var(mask_base(np.nanmean(months, axis=0), b), out, b)
 
     print("6. Land use / land cover (ESA WorldCover fractions)")
     stack = []

@@ -19,6 +19,24 @@ def comuni_with_province():
     return com.merge(prov.drop_duplicates("istat_code"), on="istat_code", how="left")
 
 
+def read_istat(path):
+    """ISTAT SDMX CSV export. Some note fields are wrapped in *single* quotes and
+    contain commas, which breaks pandas' tokenizer (readr only warns). All columns
+    the pipeline needs come before the first NOTE_* column, so parse with the csv
+    module and keep only those leading columns."""
+    import csv
+    with open(path, encoding="utf-8-sig", newline="") as fh:
+        rows = csv.reader(fh)
+        header = next(rows)
+        n_keep = next((i for i, h in enumerate(header) if h.startswith("NOTE_")), len(header))
+        data = [r[:n_keep] for r in rows if r]
+    df = pd.DataFrame(data, columns=header[:n_keep])
+    for col in ("TIME_PERIOD", "Osservazione"):
+        if col in df:
+            df[col] = pd.to_numeric(df[col], errors="coerce")
+    return df
+
+
 def gap_fill(df, col):
     df[col] = df[col].fillna(df.groupby("NUTS_ID")[col].transform("median"))
     df[col] = df[col].fillna(df[col].median())
@@ -41,7 +59,7 @@ def run():
     save_var(mask_base(rasterize(d, b.grid, field="mean_income"), b), "svi_pov.tif", b)
 
     # 2. unemployment (NUTS-3; NUTS-2016 geometry, NUTS-2006 fallback, national mean)
-    u = pd.read_csv(config.RAW / "Dati provinciali (IT1,151_914_DF_DCCV_TAXDISOCCU1_8,1.0).csv")
+    u = read_istat(config.RAW / "Dati provinciali (IT1,151_914_DF_DCCV_TAXDISOCCU1_8,1.0).csv")
     u = u[(u.SEX.astype(str) == "9") & (u.REF_AREA.str.len() == 5) & (u.DATA_TYPE == "UNEM_R")]
     u = u.sort_values("TIME_PERIOD").groupby("REF_AREA").tail(1)[["REF_AREA", "Osservazione"]]
     r16 = rasterize(gisco_nuts(3, "2016").merge(u, left_on="NUTS_ID", right_on="REF_AREA", how="left"),
@@ -54,8 +72,7 @@ def run():
     save_var(mask_base(merged, b), "svi_unemp.tif", b)
 
     # 3. foreign-born share
-    fb = pd.read_csv(config.RAW / "Popolazione per paese di nascita - comuni (IT1,DF_DCSS_HCUE_COM_3_COM,1.0).csv",
-                     dtype={"REF_AREA": str})
+    fb = read_istat(config.RAW / "Popolazione per paese di nascita - comuni (IT1,DF_DCSS_HCUE_COM_3_COM,1.0).csv")
     fb = fb[(fb.GENDER.astype(str).isin(["T", "True", "TRUE"])) & (fb.REF_AREA.str.len() == 6)
             & fb.COUNTRY_BIRTH.isin(["WORLD", "WRL_X_ITA"])]
     fb = fb.sort_values("TIME_PERIOD").groupby(["REF_AREA", "COUNTRY_BIRTH"]).tail(1)

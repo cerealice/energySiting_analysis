@@ -122,10 +122,18 @@ def distance(features_mask, grid):
     return ndimage.distance_transform_edt(~feat) * grid.res
 
 
-def save_var(arr, name, b=None):
+def save_var(arr, name, b=None, min_coverage=0.5):
+    """Write a layer and report how much of Italy it covers. A few NA cells along
+    the coast are normal (source land masks differ from the base raster); a
+    mostly-empty layer means a download or reprojection went wrong, so stop."""
     b = b or base()
+    inside = np.isfinite(b.band())
+    cov = float(np.isfinite(np.asarray(arr)[inside]).mean()) if inside.any() else 0.0
+    if cov < min_coverage:
+        raise RuntimeError(f"{name}: only {cov:.1%} of Italian cells have values — "
+                           "check the source file / download before continuing")
     raster.write(config.VAR_PATH / name, arr, b.grid, [Path(name).stem])
-    print("  saved:", name)
+    print(f"  saved: {name}  (coverage of Italy {cov:.1%})")
 
 
 def unzip_member(zip_path, member, dest):
