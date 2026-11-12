@@ -49,6 +49,10 @@ stratified folds, so the model comparison is paired.
 
 ## Running
 
+Every run ends by writing **`docs/pipeline.html`**: steps, presences, every predictor with its
+source / resolution / period, models and tuning grids, results, figures and recent changes,
+all read from the code and outputs of that run (`python python/run_all.py --docs` rebuilds only the page).
+
 ### On a cluster (LSF or SLURM) — full rebuild from raw data
 
 ```bash

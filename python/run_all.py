@@ -136,14 +136,27 @@ def run_module_raw(module, func):
     getattr(importlib.import_module(module), func)()
 
 
+def build_docs():
+    """docs/pipeline.html: what this version does + this run's results (never fails the run)."""
+    try:
+        from energysiting import docs
+        stamp(f"Docs: {docs.build()}")
+    except Exception as e:  # noqa: BLE001
+        print(f"  WARNING: could not build docs/pipeline.html ({e})")
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--setup", action="store_true")
     ap.add_argument("--force-setup", action="store_true")
     ap.add_argument("--from", dest="start", choices=[s for s, *_ in MAIN])
     ap.add_argument("--only", choices=[s for s, *_ in MAIN])
+    ap.add_argument("--docs", action="store_true", help="only (re)build docs/pipeline.html")
     a = ap.parse_args()
     config.ensure_dirs()
+    if a.docs:
+        build_docs()
+        return
 
     print("═" * 59 + "\n  Italy Renewable Energy Siting Analysis — Python pipeline\n"
           f"  Root: {config.ROOT}\n  Started: {time.strftime('%Y-%m-%d %H:%M:%S')}\n" + "═" * 59)
@@ -169,6 +182,7 @@ def main():
             stamp(f"SKIP: {name} (outputs exist)")
             continue
         run_module(name, module)
+    build_docs()
     el = time.time() - t0
     print("\n" + "═" * 59 + f"\n  Pipeline complete in {int(el // 60)}m {int(el % 60)}s\n" + "═" * 59)
 
