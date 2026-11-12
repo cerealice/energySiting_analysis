@@ -18,7 +18,8 @@ The R code is left untouched next to it so the two can be compared.
 | (section 8 of `make_variables_italy.R`) | `setup/make_spatial_lag.py` | spatial lag from pre-2017 plants, 0/1 |
 | `make_worldclim.R` | `setup/make_worldclim.py` | WorldClim BIO1–19 |
 | `stack.R` | `setup/stack.py` | 108-layer z-scored stack (R's 102 + 6 WorldTensor) + tech + future stacks |
-| `tech.R` | `tech.py` | GEM trackers + RSE Atlante → presence rasters |
+| `tech.R` | `tech.py` + `osm_plants.py` | GEM trackers + OSM plant footprints → presence rasters (RSE centroids optional) |
+| (substations in `make_variables_italy.R`) | `setup/make_substations.py` | substation distance incl. OSM substation areas |
 | `absence.R` | `absence.py` | pseudo-absences by NUTS-2, 10 seeds |
 | `zonal.R` | `zonal.py` | zone means of the 105 layers |
 | `modeling.R` | `modeling.py` + `learners.py` + `glm.py` | 10-group GLMs, 5 learners × 10-fold CV, maps |
@@ -87,6 +88,30 @@ if `rasterio` is missing, GeoTIFFs (including terra's LZW-compressed ones) are
 read by a pure-Python fallback in `energysiting/raster.py`. The setup steps and
 `tech.py` require the geospatial stack (rasterio, geopandas, pyogrio with GDAL's
 OSM driver, xarray + netCDF4).
+
+## Presence locations (Python version)
+
+R places 95% of solar and 80% of wind presences at **municipality centroids**
+(RSE Atlante totals), so their covariates describe town centres, not plants —
+which is why "Developed" and "Population density" topped solar importance.
+The Python version (`ES_PRESENCE_SOURCE=osm`, default) uses OpenStreetMap:
+
+* **Tracker plants** (GEM, start year >= 2017, as in R) take the footprint of
+  the nearest OSM plant within 2 km (GEM coordinates are often "approximate").
+* **Other plants**: OSM ground-mounted solar farms >= 1 ha (overlapping parts
+  merged; capacity = area / 10 000 m²/MW) and wind farms of >= 3 turbines
+  (turbines within 1 km linked; small turbines < 40 m / rotor < 30 m excluded),
+  unless they are a tracker plant.
+* Zonal statistics use the whole footprint (all cells it touches).
+* `derived/py/<tech>_presence_coverage.csv` compares presence capacity with the
+  RSE totals by region, as a check on OSM completeness.
+
+`ES_PRESENCE_SOURCE=rse` reproduces R's centroids. Most OSM plants are undated,
+so — as with RSE — presences are the installed stock, not only post-2017 builds.
+
+GDAL's default OSM configuration files closed ways tagged only `power=*` as
+lines; `osm_plants.osm_config()` makes them areas. This also adds the many
+substations mapped as areas to the substation-distance layer.
 
 ## Predictors (Python version)
 

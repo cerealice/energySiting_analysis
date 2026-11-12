@@ -68,19 +68,14 @@ def run():
     roads = osm("lines", "highway IS NOT NULL", ["highway"])
     save_var(mask_base(distance(rasterize(roads, g), g), b), "roads_qgis.tif", b)
 
-    print("3b. Transmission lines (>=110 kV) & substations (OSM)")
+    print("3b. Transmission lines (>=110 kV) (OSM)")
     lines = osm("lines", "other_tags LIKE '%\"power\"=>\"line\"%'", ["other_tags"])
     v = lines["other_tags"].str.extract(r'"voltage"=>"([0-9]+)')[0].astype(float)
     tx = lines[v >= 110000]
     d_tx = mask_base(distance(rasterize(tx, g), g), b)
     save_var(d_tx, "transmission_110_qgis.tif", b)
     save_var(d_tx, "transmission_110_wPlanned.tif", b)   # planned lines not in OSM: placeholder
-    sub_pts = osm("points", "other_tags LIKE '%\"power\"=>\"substation\"%'", ["other_tags"])
-    sub_poly = osm("multipolygons", "other_tags LIKE '%\"power\"=>\"substation\"%'", ["other_tags"])
-    subs = pd.concat([sub_poly.geometry.centroid, sub_pts.geometry], ignore_index=True)
-    d_sub = mask_base(distance(rasterize(gpd.GeoDataFrame(geometry=subs, crs=config.EPSG), g), g), b)
-    save_var(d_sub, "substations_110_qgis.tif", b)
-    save_var(d_sub, "substations_110_wPlanned.tif", b)
+    # substations → separate step make_substations.py (needs the power-area OSM config)
 
     print("4-5. Capacity-factor proxies (WorldClim srad / wind)")
     for var, out in (("srad", "solar_capacity.tif"), ("wind", "wind_capacity.tif")):

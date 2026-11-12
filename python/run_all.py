@@ -46,10 +46,10 @@ SETUP = [
     # (step, outputs that mark it done; None = the step decides itself)
     ("make_base_raster", [config.BASE_RASTER]),
     # tech precedes the variables: the spatial lag is built from its pre-2017 rasters
-    ("tech", [config.DERIVED / f"{t}_{f}" for t in ("solar", "wind")
-              for f in ("hull_existing.tif", "hull_existing_mask.tif", "hull_existing.csv", "pre2017.tif")]),
+    ("tech", None),                      # rebuilt unless built with the current location method
     ("make_variables_italy", [V / f for f in ("slope.tif", "pop_density.tif",
                                               "transmission_110_qgis.tif", "roads_qgis.tif")]),
+    ("make_substations", None),          # rebuilt unless built with the power-area OSM config
     ("make_spatial_lag", None),          # rebuilt unless built with the current method
     ("make_socioeconomic", [V / f for f in ("svi_pov.tif", "svi_unemp.tif", "svi_foreignborn.tif")]),
     ("make_zenodo_socioeconomic", [V / "zenodo_gdp_pc.tif", V / "zenodo_inst_quality.tif"]),
@@ -60,6 +60,19 @@ SETUP = [
     ("make_worldclim", [V / f"wclim_bio{i:02d}.tif" for i in range(1, 20)]),
     ("stack", None),                     # rebuilt when any input layer is newer
 ]
+
+
+def inputs_of(step):
+    """Files whose change invalidates a main-pipeline step's outputs."""
+    if step == "absence":
+        return [config.DERIVED / f"{t}_hull_existing{s}" for t in ("solar", "wind")
+                for s in (".csv", "_mask.tif")]
+    return []
+
+
+def fresh(outputs, inputs):
+    ins = [p for p in inputs if p.exists()]
+    return not ins or min(p.stat().st_mtime for p in outputs) >= max(p.stat().st_mtime for p in ins)
 
 
 def stamp(msg):
@@ -92,6 +105,16 @@ def run_setup(force=False):
                 sys.exit(f"WorldTensor inputs missing and download failed ({e}).\n"
                          "Run `python -m energysiting.setup.fetch` on a node with internet first.")
             continue
+        if name == "tech" and not force:
+            from energysiting import tech
+            if tech.up_to_date():
+                stamp(f"SKIP: tech (presence locations already built from '{tech.SOURCE}')")
+                continue
+        if name == "make_substations" and not force:
+            from energysiting.setup import make_substations
+            if make_substations.up_to_date():
+                stamp("SKIP: make_substations (built with the power-area OSM config)")
+                continue
         if name == "make_spatial_lag" and not force:
             from energysiting.setup import make_spatial_lag
             if make_spatial_lag.up_to_date():
@@ -134,9 +157,15 @@ def main():
     elif a.start:
         steps = MAIN[[s[0] for s in MAIN].index(a.start):]
     for name, module, outputs in steps:
-        if name == "tech" and (a.setup or a.force_setup):
-            continue                      # already handled inside the setup sequence
-        if outputs and not a.only and not a.force_setup and all(p.exists() for p in outputs):
+        if name == "tech":
+            if a.setup or a.force_setup:
+                continue                  # already handled inside the setup sequence
+            from energysiting import tech
+            if not a.only and tech.up_to_date():
+                stamp(f"SKIP: tech (presence locations already built from '{tech.SOURCE}')")
+                continue
+        if outputs and not a.only and not a.force_setup and all(p.exists() for p in outputs) \
+                and fresh(outputs, inputs_of(name)):
             stamp(f"SKIP: {name} (outputs exist)")
             continue
         run_module(name, module)
