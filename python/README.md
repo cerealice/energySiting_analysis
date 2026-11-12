@@ -96,6 +96,14 @@ OSM driver, xarray + netCDF4).
 * `tech` runs before `make_variables_italy` in the setup: the spatial-lag
   layers are computed from the presence rasters, which R's `run_setup()` builds
   only later (it works in R only when `derived/` already exists).
+* **Wind model: +4 derived ERA5 wind features** (`era5_ws10_mean`, `era5_ws100_mean`,
+  `era5_wpd100`, `era5_ws100_iav`), which R builds into the stack but leaves out of
+  `region_model` → 100 predictors for wind, 96 for solar. Set
+  `ES_WIND_ERA5_DERIVED=0` to get R's formula back. Paired test on the same data
+  and folds (Nov 2026): 10-fold AUC GBM 0.850 → 0.850, RF 0.837 → 0.834; spatial-block
+  GBM 0.811 → 0.807 — no measurable gain, because WorldTensor only has annual-mean
+  U/V, so these are speeds of the mean wind *vector* and largely duplicate
+  `era5_u100_mean`. `ES_DROP_VARS=lag,...` drops predictors for sensitivity runs.
 * Random number streams differ from R, so pseudo-absences, folds and stochastic
   learners are not bit-identical; presence covariates match R to 1e-14.
 * RF importance: permutation importance (presence-class recall) instead of

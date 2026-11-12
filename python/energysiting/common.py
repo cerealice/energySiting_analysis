@@ -43,12 +43,12 @@ def load_stacks():
     return cov, fut, tech
 
 
-def prediction_frame(cov, fut, tech_stack, base_mask):
+def prediction_frame(cov, fut, tech_stack, base_mask, variables=None):
     """Cell-level predictor table for the *future* scenario (current tx/sub swapped
     for the planned-infrastructure layers), restricted to cells inside Italy."""
     rr, cc = np.nonzero(base_mask)
     cols = {}
-    for name in config.MODEL_VARS:
+    for name in (variables or config.MODEL_VARS):
         if name in config.FUTURE_LAYERS:
             src = fut[name]
         elif name in config.TECH_LAYERS:

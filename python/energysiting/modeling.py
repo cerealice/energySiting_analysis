@@ -31,13 +31,13 @@ def make_groups(n):
     return np.concatenate([np.repeat(np.arange(1, 11), each), np.repeat(10, n % 10)])
 
 
-def glm_groups(bg: pd.DataFrame, ex: pd.DataFrame):
+def glm_groups(bg: pd.DataFrame, ex: pd.DataFrame, mv: list):
     rst, aic = [], []
     for g in range(1, 11):
         dat = impute_dat(pd.concat([bg[bg.group == g].drop(columns="group"), ex], ignore_index=True))
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")
-            fit = BinomialGLM().fit(dat[config.MODEL_VARS], dat["treat"])
+            fit = BinomialGLM().fit(dat[mv], dat["treat"])
         s = fit.summary().drop(index="(Intercept)")
         rst.append(pd.DataFrame({
             "var_id": s.index, "var": [config.COEF_LABELS.get(v, v) for v in s.index],
@@ -53,7 +53,9 @@ def run_tech(tech, stacks, base):
     bg = pd.read_csv(config.OUT / f"bg_cov_{tech}.csv")
     bg["group"] = make_groups(len(bg))
 
-    rst, aic = glm_groups(bg, ex)
+    mv = config.model_vars(tech)
+    log(f"{tech}: {len(mv)} predictors")
+    rst, aic = glm_groups(bg, ex, mv)
     best_group = int(np.argsort(aic, kind="stable")[4]) + 1          # which(aic == sort(aic)[5])
     log(f"{tech}: GLM AIC by group {np.round(aic, 1).tolist()} → using group {best_group}")
 
@@ -63,17 +65,17 @@ def run_tech(tech, stacks, base):
     out["treat"] = np.where(out["treat"] == 1, "X1", "X0")
     out.to_csv(config.OUT / f"{tech}.csv", index=False)
 
-    X, y = dat[config.MODEL_VARS], dat["treat"].astype(int).to_numpy()
-    medians = dat[config.MODEL_VARS].median()
+    X, y = dat[mv], dat["treat"].astype(int).to_numpy()
+    medians = dat[mv].median()
     folds = stratified_folds(y, 10, config.SEED)
     joblib.dump(folds, config.OUT / f"folds_{tech}.joblib")
 
     cov, fut, tech_stacks = stacks
     base_mask = np.isfinite(base.band())
-    grid_df, (rr, cc) = prediction_frame(cov, fut, tech_stacks[tech], base_mask)
+    grid_df, (rr, cc) = prediction_frame(cov, fut, tech_stacks[tech], base_mask, mv)
     # NOTE: luh3_c4per is NA everywhere in covStack, so R's raster::predict (na.rm)
     # dropped every cell and wrote empty maps. We impute exactly as for training.
-    grid_df = impute_dat(grid_df, medians)[config.MODEL_VARS]
+    grid_df = impute_dat(grid_df, medians)[mv]
 
     def write_map(model_key, p):
         arr = np.full(base.grid.shape, np.nan, np.float32)

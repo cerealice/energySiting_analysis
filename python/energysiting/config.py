@@ -116,6 +116,25 @@ MODEL_VARS = (
 )
 assert len(MODEL_VARS) == 96
 
+# Derived ERA5 wind-resource features (make_worldtensor.R section 4). They are in
+# the stack but were not in R's region_model; the wind model now uses them.
+# NB: WorldTensor provides annual-mean U/V only, so these are speeds of the
+# mean wind *vector* (lower than the true mean speed where direction varies).
+WIND_ERA5_DERIVED = ["era5_ws10_mean", "era5_ws100_mean", "era5_wpd100", "era5_ws100_iav"]
+
+
+def model_vars(tech: str) -> list:
+    """Predictors for one technology.
+
+    ES_WIND_ERA5_DERIVED=0  → R's original formula for wind (96 predictors)
+    ES_DROP_VARS=lag,...    → drop predictors (sensitivity runs)
+    """
+    v = list(MODEL_VARS)
+    if tech == "wind" and os.environ.get("ES_WIND_ERA5_DERIVED", "1") != "0":
+        v = v[:-3] + WIND_ERA5_DERIVED + v[-3:]
+    drop = {d.strip() for d in os.environ.get("ES_DROP_VARS", "").split(",") if d.strip()}
+    return [x for x in v if x not in drop]
+
 # ── Display labels (modeling.R var_labels / imp recode) ───────────────────────
 VAR_LABELS = {
     "tx": "Transmission dist", "roads": "Road dist", "sub": "Substation dist",
@@ -155,6 +174,10 @@ VAR_LABELS = {
     "lulc_riparian": "Riparian", "lulc_sparse": "Vegetated", "lulc_agriculture": "Agriculture",
     "lulc_developed": "Developed", "lulc_other": "Otherland",
     "env": "Environmental score", "cf": "Capacity factor", "lag": "Spatial lag",
+    "era5_ws10_mean": "Wind speed 10m (ERA5)", "era5_ws100_mean": "Wind speed 100m (ERA5)",
+    "era5_wpd100": "Wind power density 100m (ERA5)", "era5_ws100_iav": "Wind speed 100m IAV (ERA5)",
+    "era5_clearness": "Clearness index (ERA5)", "era5_direct_frac": "Direct irradiance frac (ERA5)",
+    "era5_ssrd_iav": "Solar radiation IAV (ERA5)",
 }
 # GLM coefficient plot (f2): NUTS-2 dummies collapse to their NUTS-1 macro-region.
 COEF_LABELS = dict(VAR_LABELS)
