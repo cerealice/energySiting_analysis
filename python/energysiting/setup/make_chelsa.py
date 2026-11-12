@@ -15,8 +15,9 @@ import numpy as np
 
 from .. import config
 
-URL = ("https://os.zhdk.cloud.switch.ch/envicloud/chelsa/chelsa_V2/GLOBAL/climatologies/"
-       "1981-2010/bio/CHELSA_bio{n}_1981-2010_V.2.1.tif")
+PATH = "GLOBAL/climatologies/1981-2010/bio/CHELSA_bio{n}_1981-2010_V.2.1.tif"
+BASES = ("https://os.zhdk.cloud.switch.ch/chelsav2/",                  # current bucket
+         "https://os.zhdk.cloud.switch.ch/envicloud/chelsa/chelsa_V2/")  # older bucket name
 DIR = config.RAW / "chelsa"
 WINDOW = (6.0, 35.5, 19.0, 48.0)          # lon/lat box around Italy (W, S, E, N)
 
@@ -51,15 +52,38 @@ def fetch():
     with rasterio.Env(GDAL_DISABLE_READDIR_ON_OPEN="EMPTY_DIR", GDAL_HTTP_MAX_RETRY="5",
                       GDAL_HTTP_RETRY_DELAY="10", CPL_VSIL_CURL_ALLOWED_EXTENSIONS=".tif"):
         for n in missing:
-            url = URL.format(n=n)
-            try:
-                _crop(f"/vsicurl/{url}", crop_path(n))
-                print(f"  CHELSA bio{n}: Italy window read remotely")
-            except Exception as e:  # noqa: BLE001
-                print(f"  CHELSA bio{n}: range read failed ({e}); downloading the global file")
-                full = download(url, DIR / f"CHELSA_bio{n}_1981-2010_V.2.1.tif")
-                _crop(full, crop_path(n))
-                full.unlink()
+            manual = DIR / f"CHELSA_bio{n}_1981-2010_V.2.1.tif"
+            if manual.exists():                      # global file placed by hand
+                _crop(manual, crop_path(n))
+                print(f"  CHELSA bio{n}: cropped from {manual.name}")
+                continue
+            errors = []
+            for base in BASES:                       # 1) Italy window via range reads
+                url = base + PATH.format(n=n)
+                try:
+                    _crop(f"/vsicurl/{url}", crop_path(n))
+                    print(f"  CHELSA bio{n}: Italy window read remotely ({base})")
+                    break
+                except Exception as e:  # noqa: BLE001
+                    errors.append(f"{url}: {e}")
+            else:
+                for base in BASES:                   # 2) whole global file
+                    url = base + PATH.format(n=n)
+                    try:
+                        print(f"  CHELSA bio{n}: range read failed; downloading {url}")
+                        full = download(url, DIR / f"CHELSA_bio{n}_1981-2010_V.2.1.tif")
+                    except Exception as e:  # noqa: BLE001
+                        errors.append(f"{url}: {e}")
+                        continue
+                    _crop(full, crop_path(n))
+                    full.unlink()
+                    break
+                else:
+                    raise SystemExit(
+                        f"CHELSA bio{n} could not be downloaded:\n  " + "\n  ".join(errors) +
+                        "\nGet the file from https://www.chelsa-climate.org/datasets/chelsa_climatologies "
+                        f"and save it as {DIR / f'CHELSA_bio{n}_1981-2010_V.2.1.tif'}, "
+                        "then re-run; or check the current bucket URL there and edit BASES.")
 
 
 def ready():
