@@ -23,6 +23,20 @@ FILES = {
     "gwa_cf": DIR / "GWA_ITA_capacity-factor_IEC2.tif",
     "gwa_ws100": DIR / "GWA_ITA_wind-speed_100m.tif",
 }
+# names the files have when downloaded by hand from the atlas websites
+ORIGINAL = {
+    "pvout": ["PVOUT.tif"],
+    "gwa_cf": ["ITA_capacity-factor_IEC2.tif", "ITA_capacity_factor_IEC2.tif"],
+    "gwa_ws100": ["ITA_wind-speed_100m.tif", "ITA_wind_speed_100m.tif"],
+}
+
+
+def path(key):
+    """The file for `key`: the canonical name, or the website's original name."""
+    for p in [FILES[key]] + [DIR / n for n in ORIGINAL[key]]:
+        if p.exists():
+            return p
+    return FILES[key]
 CANDIDATES = {
     "pvout": ["https://api.globalsolaratlas.info/download/Italy/Italy_GISdata_LTAy_AvgDailyTotals_GlobalSolarAtlas-v2_GEOTIFF.zip",
               "https://api.globalsolaratlas.info/download/Italy/Italy_GISdata_LTAy_YearlyMonthlyTotals_GlobalSolarAtlas-v2_GEOTIFF.zip"],
@@ -31,9 +45,10 @@ CANDIDATES = {
     "gwa_ws100": ["https://globalwindatlas.info/api/gis/country/ITA/wind-speed/100"],
 }
 MANUAL = {
-    "pvout": "https://globalsolaratlas.info/download/italy → 'GIS data', LTAy GeoTIFF; take PVOUT.tif from the zip",
-    "gwa_cf": "https://globalwindatlas.info/en/area/Italy → Download → GIS files → Capacity Factor IEC Class II",
-    "gwa_ws100": "https://globalwindatlas.info/en/area/Italy → Download → GIS files → Mean Wind Speed, 100 m",
+    "pvout": "https://globalsolaratlas.info/download/italy → 'GIS data', LTAym YearlyMonthlyTotals GeoTIFF; "
+             "take the yearly PVOUT.tif from the zip",
+    "gwa_cf": "open https://globalwindatlas.info/api/gis/country/ITA/capacity-factor_IEC2 in a browser",
+    "gwa_ws100": "open https://globalwindatlas.info/api/gis/country/ITA/wind-speed/100 in a browser",
 }
 
 
@@ -59,8 +74,8 @@ def fetch():
     DIR.mkdir(parents=True, exist_ok=True)
     problems = []
     for key, dest in FILES.items():
-        if dest.exists():
-            print(f"  ok        {dest.relative_to(config.ROOT)}")
+        if path(key).exists():
+            print(f"  ok        {path(key).relative_to(config.ROOT)}")
             continue
         for url in CANDIDATES[key]:
             try:
@@ -70,12 +85,12 @@ def fetch():
             except Exception as e:  # noqa: BLE001
                 print(f"  {key}: {url} failed ({e})")
         if not dest.exists():
-            problems.append(f"download by hand: {MANUAL[key]}\n      save as {dest.relative_to(config.ROOT)}")
+            problems.append(f"download by hand: {MANUAL[key]}\n      save in {DIR.relative_to(config.ROOT)}/")
     return problems
 
 
 def ready():
-    return all(p.exists() for p in FILES.values())
+    return all(path(k).exists() for k in FILES)
 
 
 def run():
@@ -84,9 +99,9 @@ def run():
     if not ready():
         raise SystemExit("Resource atlases missing — run `python -m energysiting.setup.fetch` on a login node")
     b = base()
-    save_var(snap(FILES["pvout"], "average", b=b), "solar_capacity.tif", b)
-    save_var(snap(FILES["gwa_cf"], "average", b=b), "wind_capacity.tif", b)
-    save_var(snap(FILES["gwa_ws100"], "average", b=b), "gwa_ws100.tif", b)
+    save_var(snap(path("pvout"), "average", b=b), "solar_capacity.tif", b)
+    save_var(snap(path("gwa_cf"), "average", b=b), "wind_capacity.tif", b)
+    save_var(snap(path("gwa_ws100"), "average", b=b), "gwa_ws100.tif", b)
 
 
 if __name__ == "__main__":
