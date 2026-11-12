@@ -1,7 +1,19 @@
-"""make_worldtensor.R — ERA5 (mean 2000–2020), LUH3 states (2020), MODIS NDVI
-(mean 2003–2020) and derived ERA5 features from the WorldTensor NetCDFs
-downloaded by syntax/download_worldtensor.py."""
+"""make_worldtensor.R — WorldTensor layers on the 1 km grid.
+
+Each layer in config.WT_CATALOG is the mean of the yearly files selected in
+data/raw_downloads/worldtensor/manifest.json (latest ES_WT_YEARS years each
+variable has: ERA5 2021–2025, LUH3 2020–2024, NDVI 2021–2025, CAMS aerosols /
+PM2.5 2020–2024, population 2016–2020, nighttime lights 2014–2018) or the single
+static file (GMTED elevation / slope). Derived ERA5 features (wind speed, power
+density, clearness, direct fraction, interannual variability) use the same window.
+
+A layer is rebuilt whenever its source files change (tracked in
+data/processed_data/variables/worldtensor_layers.json), so changing the window
+never leaves stale 2000–2020 layers behind.
+"""
 from __future__ import annotations
+
+import json
 
 import numpy as np
 import xarray as xr
@@ -9,14 +21,10 @@ from rasterio.transform import from_bounds
 
 from .. import config, raster
 from ._geo import base, mask_base, save_var, snap_array
+from .worldtensor import WT_DIR, load_manifest
 
-WT = config.RAW / "worldtensor"
 BBOX = (6.5, 18.5, 36.0, 47.5)       # lon/lat crop before reprojection
-ERA5 = ["t2m_mean", "t2m_max", "t2m_min", "t2m_std", "d2m_mean", "tp_sum", "cp_sum", "sf_sum",
-        "e_sum", "pev_sum", "ro_sum", "u10_mean", "v10_mean", "u100_mean", "v100_mean", "i10fg_mean",
-        "ssrd_sum", "ssr_sum", "cdir_sum", "ssrdc_sum", "tcc_mean", "blh_mean", "sp_mean", "cape_mean"]
-LUH3 = ["primf", "primn", "secdf", "secdn", "pastr", "range", "urban",
-        "c3ann", "c4ann", "c3per", "c4per", "c3nfx"]
+STATE = config.VAR_PATH / "worldtensor_layers.json"
 
 
 def orient(arr, lon, lat):
@@ -59,53 +67,67 @@ def to_grid(arr2d, lons, lats, b):
     return snap_array(arr2d, tr, "EPSG:4326", "bilinear", b)
 
 
-def years_stack(domain, var, years, b):
-    """Every layer of every year, snapped to the base grid → (layers, rows, cols)."""
+def stack_keys(keys, b, per_file=False):
+    """Snap every layer of the given archive members → (layers, rows, cols).
+    per_file=True averages layers within each file first (one layer per year)."""
     out = []
-    for y in years:
-        p = WT / domain / var / f"{y}.nc"
-        if p.exists():
-            a, lo, la = read_nc(p)
-            out.extend(to_grid(layer, lo, la, b) for layer in a)
-    if not out:
-        raise FileNotFoundError(f"No files for {domain}/{var}")
+    for k in keys:
+        a, lo, la = read_nc(WT_DIR / k)
+        g = [to_grid(layer, lo, la, b) for layer in a]
+        out.extend([np.nanmean(g, 0)] if per_file and len(g) > 1 else g)
     return np.stack(out)
-
-
-def safe_write(name, fn, b, na_fill=None):
-    if (config.VAR_PATH / name).exists():
-        print("Exists:", name)
-        return
-    try:
-        r = fn()
-        if na_fill is not None:
-            r = mask_base(np.where(np.isnan(r), na_fill, r), b)
-        save_var(r, name, b)
-    except Exception as e:  # noqa: BLE001
-        print(f"SKIP:   {name} — {e}")
 
 
 def run():
     config.ensure_dirs()
+    m = load_manifest()
+    if m is None:
+        raise SystemExit("No WorldTensor manifest — run `python -m energysiting.setup.fetch` "
+                         "(or energysiting.setup.worldtensor) on a node with internet first.")
+    layers = m["layers"]
     b = base()
-    yrs = range(2000, 2021)
-    for v in ERA5:
-        safe_write(f"era5_{v}.tif", lambda v=v: np.nanmean(years_stack("climate", v, yrs, b), 0), b)
-    for v in LUH3:
-        safe_write(f"luh3_{v}.tif", lambda v=v: np.nanmean(years_stack("land_use/states", v, [2020], b), 0), b, na_fill=0)
-    safe_write("wt_ndvi_mean.tif",
-               lambda: np.nanmean(years_stack("vegetation", "ndvi_mean", range(2003, 2021), b), 0), b)
+    state = json.loads(STATE.read_text()) if STATE.exists() else {}
 
-    L = lambda n: raster.read(config.VAR_PATH / n).band().astype("float64")  # noqa: E731
-    safe_write("era5_ws10_mean.tif", lambda: np.hypot(L("era5_u10_mean.tif"), L("era5_v10_mean.tif")), b)
-    safe_write("era5_ws100_mean.tif", lambda: np.hypot(L("era5_u100_mean.tif"), L("era5_v100_mean.tif")), b)
-    safe_write("era5_wpd100.tif", lambda: np.hypot(L("era5_u100_mean.tif"), L("era5_v100_mean.tif")) ** 3, b)
-    safe_write("era5_clearness.tif", lambda: L("era5_ssr_sum.tif") / L("era5_ssrd_sum.tif"), b)
-    safe_write("era5_direct_frac.tif", lambda: L("era5_cdir_sum.tif") / L("era5_ssrdc_sum.tif"), b)
-    safe_write("era5_ssrd_iav.tif", lambda: np.nanstd(years_stack("climate", "ssrd_sum", yrs, b), 0, ddof=1), b)
-    safe_write("era5_ws100_iav.tif", lambda: np.nanstd(np.hypot(years_stack("climate", "u100_mean", yrs, b),
-                                                                years_stack("climate", "v100_mean", yrs, b)),
-                                                       0, ddof=1), b)
+    def build(name, source_keys, fn, na_fill=None):
+        out = config.VAR_PATH / f"{name}.tif"
+        if out.exists() and state.get(name) == source_keys:
+            print("Up to date:", out.name)
+            return
+        with np.errstate(invalid="ignore", divide="ignore"):
+            r = fn()
+        if na_fill is not None:
+            r = mask_base(np.where(np.isnan(r), na_fill, r), b)
+        save_var(r, out.name, b)
+        state[name] = source_keys
+        STATE.write_text(json.dumps(state, indent=1))
+
+    for name, (path, var, temporal) in config.WT_CATALOG.items():
+        keys = layers[name]["keys"]
+        yrs = layers[name]["years"]
+        print(f"{name}: {f'mean {yrs[0]}–{yrs[-1]}' if yrs else 'static'}")
+        fill = 0 if name.startswith("luh3_") else None    # absent land-use type → 0
+        build(name, keys, lambda keys=keys: np.nanmean(stack_keys(keys, b), 0), na_fill=fill)
+
+    # Derived ERA5 features — same window as their inputs
+    L = lambda n: raster.read(config.VAR_PATH / f"{n}.tif", cache=False).band().astype("float64")  # noqa: E731
+    K = lambda *ns: [k for n in ns for k in layers[n]["keys"]]                                      # noqa: E731
+    build("era5_ws10_mean", K("era5_u10_mean", "era5_v10_mean"),
+          lambda: np.hypot(L("era5_u10_mean"), L("era5_v10_mean")))
+    build("era5_ws100_mean", K("era5_u100_mean", "era5_v100_mean"),
+          lambda: np.hypot(L("era5_u100_mean"), L("era5_v100_mean")))
+    build("era5_wpd100", K("era5_u100_mean", "era5_v100_mean"),
+          lambda: np.hypot(L("era5_u100_mean"), L("era5_v100_mean")) ** 3)
+    build("era5_clearness", K("era5_ssr_sum", "era5_ssrd_sum"),
+          lambda: L("era5_ssr_sum") / L("era5_ssrd_sum"))
+    build("era5_direct_frac", K("era5_cdir_sum", "era5_ssrdc_sum"),
+          lambda: L("era5_cdir_sum") / L("era5_ssrdc_sum"))
+    # interannual variability: SD of the yearly values within the window
+    build("era5_ssrd_iav", K("era5_ssrd_sum"),
+          lambda: np.nanstd(stack_keys(layers["era5_ssrd_sum"]["keys"], b, per_file=True), 0, ddof=1))
+    build("era5_ws100_iav", K("era5_u100_mean", "era5_v100_mean"),
+          lambda: np.nanstd(np.hypot(stack_keys(layers["era5_u100_mean"]["keys"], b, per_file=True),
+                                     stack_keys(layers["era5_v100_mean"]["keys"], b, per_file=True)),
+                            0, ddof=1))
 
 
 if __name__ == "__main__":

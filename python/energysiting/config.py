@@ -96,7 +96,44 @@ CONT_LAYERS = (
 LULC_LAYERS = ["lulc_forest", "lulc_grassland", "lulc_shrubland", "lulc_riparian",
                "lulc_sparse", "lulc_agriculture", "lulc_developed", "lulc_other"]
 NUTS2_LAYERS = ["nuts2_" + i.lower() for i in NUTS2_IDS]
-COV_LAYERS = CONT_LAYERS + LULC_LAYERS + NUTS2_LAYERS          # 73 + 8 + 21 = 102
+# Extra WorldTensor layers added in the Python port (continuous, z-scored).
+WT_EXTRA_LAYERS = ["aq_aod550_mean", "aq_pm2p5_mean",            # CAMS EAC4 air quality
+                   "wt_population_density", "wt_ntl_harmonized",  # human systems
+                   "wt_elevation_mean", "wt_slope_mean"]          # GMTED2010 topography (static)
+CONT_LAYERS_ALL = CONT_LAYERS + WT_EXTRA_LAYERS                    # 73 + 6 = 79
+COV_LAYERS = CONT_LAYERS_ALL + LULC_LAYERS + NUTS2_LAYERS          # 79 + 8 + 21 = 108
+COV_LAYERS_R = CONT_LAYERS + LULC_LAYERS + NUTS2_LAYERS            # R's covStack: 102
+
+
+def cov_layout(n_bands: int) -> list:
+    """Layer names of a covStack.tif with n_bands layers (Python 108 or R 102)."""
+    for layout in (COV_LAYERS, COV_LAYERS_R):
+        if n_bands == len(layout):
+            return layout
+    raise ValueError(f"covStack.tif has {n_bands} layers; expected {len(COV_LAYERS)} or {len(COV_LAYERS_R)}")
+
+
+# ── WorldTensor (Zenodo 10.5281/zenodo.19047618) ──────────────────────────────
+# output layer → (path inside the domain archives, variable, temporal?)
+# Time-varying variables are averaged over the latest WT_YEARS years each
+# variable has in the archive (resolved at download time → manifest.json).
+WT_YEARS = int(os.environ.get("ES_WT_YEARS", "5"))
+_ERA5 = ["t2m_mean", "t2m_max", "t2m_min", "t2m_std", "d2m_mean", "tp_sum", "cp_sum", "sf_sum",
+         "e_sum", "pev_sum", "ro_sum", "u10_mean", "v10_mean", "u100_mean", "v100_mean", "i10fg_mean",
+         "ssrd_sum", "ssr_sum", "cdir_sum", "ssrdc_sum", "tcc_mean", "blh_mean", "sp_mean", "cape_mean"]
+_LUH3 = ["primf", "primn", "secdf", "secdn", "pastr", "range", "urban",
+         "c3ann", "c4ann", "c3per", "c4per", "c3nfx"]
+WT_CATALOG = (
+    {f"era5_{v}": ("climate", v, True) for v in _ERA5}
+    | {f"luh3_{v}": ("land_use/states", v, True) for v in _LUH3}
+    | {"wt_ndvi_mean": ("vegetation", "ndvi_mean", True),
+       "aq_aod550_mean": ("air_quality", "aod550_mean", True),
+       "aq_pm2p5_mean": ("air_quality", "pm2p5_mean", True),
+       "wt_population_density": ("human_systems", "population_density", True),
+       "wt_ntl_harmonized": ("human_systems", "ntl_harmonized", True),
+       "wt_elevation_mean": ("static/topography", "elevation_mean", False),
+       "wt_slope_mean": ("static/topography", "slope_mean", False)}
+)
 TECH_LAYERS = ["env", "cf", "lag"]
 FUTURE_LAYERS = ["tx", "sub"]
 
@@ -124,14 +161,21 @@ WIND_ERA5_DERIVED = ["era5_ws10_mean", "era5_ws100_mean", "era5_wpd100", "era5_w
 
 
 def model_vars(tech: str) -> list:
-    """Predictors for one technology.
+    """Predictors for one technology: R's 96 + 6 extra WorldTensor layers
+    (+ 4 derived ERA5 wind features for wind) → solar 102, wind 106.
 
-    ES_WIND_ERA5_DERIVED=0  → R's original formula for wind (96 predictors)
+    ES_WT_EXTRA=0           → leave out the 6 extra WorldTensor layers
+    ES_WIND_ERA5_DERIVED=0  → leave out the derived ERA5 wind features
     ES_DROP_VARS=lag,...    → drop predictors (sensitivity runs)
+    Callers keep only the predictors present in their data (an R-built stack has
+    no extra WorldTensor layers).
     """
-    v = list(MODEL_VARS)
+    v = list(MODEL_VARS[:-3])
+    if os.environ.get("ES_WT_EXTRA", "1") != "0":
+        v += WT_EXTRA_LAYERS
     if tech == "wind" and os.environ.get("ES_WIND_ERA5_DERIVED", "1") != "0":
-        v = v[:-3] + WIND_ERA5_DERIVED + v[-3:]
+        v += WIND_ERA5_DERIVED
+    v += TECH_LAYERS
     drop = {d.strip() for d in os.environ.get("ES_DROP_VARS", "").split(",") if d.strip()}
     return [x for x in v if x not in drop]
 
@@ -173,11 +217,14 @@ VAR_LABELS = {
     "lulc_forest": "Forest", "lulc_grassland": "Grassland", "lulc_shrubland": "Shrubland",
     "lulc_riparian": "Riparian", "lulc_sparse": "Vegetated", "lulc_agriculture": "Agriculture",
     "lulc_developed": "Developed", "lulc_other": "Otherland",
-    "env": "Environmental score", "cf": "Capacity factor", "lag": "Spatial lag",
+    "env": "Environmental score", "cf": "Capacity factor", "lag": "Spatial lag (pre-2017 plants)",
     "era5_ws10_mean": "Wind speed 10m (ERA5)", "era5_ws100_mean": "Wind speed 100m (ERA5)",
     "era5_wpd100": "Wind power density 100m (ERA5)", "era5_ws100_iav": "Wind speed 100m IAV (ERA5)",
     "era5_clearness": "Clearness index (ERA5)", "era5_direct_frac": "Direct irradiance frac (ERA5)",
     "era5_ssrd_iav": "Solar radiation IAV (ERA5)",
+    "aq_aod550_mean": "Aerosol optical depth (CAMS)", "aq_pm2p5_mean": "PM2.5 (CAMS)",
+    "wt_population_density": "Population density (WT)", "wt_ntl_harmonized": "Nighttime lights (WT)",
+    "wt_elevation_mean": "Elevation (GMTED)", "wt_slope_mean": "Terrain slope (GMTED)",
 }
 # GLM coefficient plot (f2): NUTS-2 dummies collapse to their NUTS-1 macro-region.
 COEF_LABELS = dict(VAR_LABELS)

@@ -9,12 +9,11 @@ downloads that are already on disk, so the batch job then runs fully offline.
     python -m energysiting.setup.fetch --check    # only report what is missing
 
 Sizes (approx.): WorldClim bio 9.7 GB, srad 2.6 GB, wind 0.7 GB, OSM Italy PBF
-2.2 GB, GISCO communes 0.3 GB, WorldTensor subset 0.9 GB, others < 0.5 GB.
+2.2 GB, GISCO communes 0.3 GB, WorldTensor selection ~0.5 GB, others < 0.5 GB.
 """
 from __future__ import annotations
 
 import argparse
-import subprocess
 import sys
 
 from .. import config
@@ -58,12 +57,6 @@ REPO_INPUTS = [
 ]
 
 
-def worldtensor_complete():
-    probe = [R / "worldtensor" / p for p in ("climate/t2m_mean/2010.nc", "climate/ssrd_sum/2010.nc",
-                                             "land_use/states/urban/2020.nc", "vegetation/ndvi_mean/2010.nc")]
-    return all(p.exists() for p in probe)
-
-
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--check", action="store_true", help="report missing inputs, download nothing")
@@ -82,15 +75,15 @@ def main():
         else:
             download(url, dest)
 
-    if not worldtensor_complete():
-        if a.check:
-            problems.append("WorldTensor NetCDFs not downloaded yet")
-        else:
-            print("  downloading WorldTensor subset (syntax/download_worldtensor.py)")
-            r = subprocess.run([sys.executable, "syntax/download_worldtensor.py", "--workers", "2"],
-                               cwd=config.ROOT)
-            if r.returncode != 0 or not worldtensor_complete():
-                problems.append("WorldTensor download incomplete — re-run this step")
+    from . import worldtensor
+    if worldtensor.ready():
+        m = worldtensor.load_manifest()["layers"]
+        print(f"  ok        WorldTensor: {len(m)} layers, latest {config.WT_YEARS} years each (manifest)")
+    elif a.check:
+        problems.append("WorldTensor selection not downloaded yet (python -m energysiting.setup.worldtensor)")
+    else:
+        print("  WorldTensor: resolving the latest years in the archives and extracting ...")
+        worldtensor.download()
 
     if not NATURA_SHP.exists():
         problems.append(

@@ -3,7 +3,7 @@
 #  run_all.sh — Python / scikit-learn pipeline on a Linux cluster (LSF or SLURM)
 #
 #  Rebuilds EVERYTHING from the raw sources: base raster, all covariate layers,
-#  the 102-layer stack, presence/absence data, models, CV and figures.
+#  the 108-layer stack, presence/absence data, models, CV and figures.
 #  Nothing from derived/ or data/processed_data/ needs to be copied over.
 #
 #  From the repository root, on the LOGIN node (needs internet):

@@ -19,7 +19,6 @@ from __future__ import annotations
 
 import argparse
 import importlib
-import subprocess
 import sys
 import time
 import traceback
@@ -44,22 +43,22 @@ MAIN = [
 
 V = config.VAR_PATH
 SETUP = [
+    # (step, outputs that mark it done; None = the step decides itself)
     ("make_base_raster", [config.BASE_RASTER]),
-    # tech must precede make_variables_italy: the spatial-lag layers are built from
-    # derived/<tech>_hull_existing.tif (R's run_setup() has this ordering gap).
-    ("tech", [config.DERIVED / "solar_hull_existing.tif", config.DERIVED / "wind_hull_existing.tif",
-              config.DERIVED / "solar_hull_existing.csv", config.DERIVED / "wind_hull_existing.csv"]),
+    # tech precedes the variables: the spatial lag is built from its pre-2017 rasters
+    ("tech", [config.DERIVED / f"{t}_{f}" for t in ("solar", "wind")
+              for f in ("hull_existing.tif", "hull_existing_mask.tif", "hull_existing.csv", "pre2017.tif")]),
     ("make_variables_italy", [V / f for f in ("slope.tif", "pop_density.tif",
                                               "transmission_110_qgis.tif", "roads_qgis.tif")]),
+    ("make_spatial_lag", None),          # rebuilt unless built with the current method
     ("make_socioeconomic", [V / f for f in ("svi_pov.tif", "svi_unemp.tif", "svi_foreignborn.tif")]),
     ("make_zenodo_socioeconomic", [V / "zenodo_gdp_pc.tif", V / "zenodo_inst_quality.tif"]),
     ("make_natura2000", [V / "env_impactScore_solar.tif", V / "env_impactScore_wind.tif"]),
     ("make_nuts2_regions", [V / f"{l}.tif" for l in config.NUTS2_LAYERS]),
-    ("download_worldtensor", None),
-    ("make_worldtensor", [V / f for f in ("era5_t2m_mean.tif", "luh3_urban.tif", "wt_ndvi_mean.tif",
-                                          "era5_ws100_mean.tif", "era5_ws100_iav.tif")]),
+    ("worldtensor", None),               # download (needs internet) unless manifest + files present
+    ("make_worldtensor", None),          # rebuilds only layers whose source years changed
     ("make_worldclim", [V / f"wclim_bio{i:02d}.tif" for i in range(1, 20)]),
-    ("stack", None),
+    ("stack", None),                     # rebuilt when any input layer is newer
 ]
 
 
@@ -81,32 +80,37 @@ def run_module(name, module):
 
 def run_setup(force=False):
     for name, outputs in SETUP:
-        if name == "download_worldtensor":
-            probe = config.RAW / "worldtensor" / "climate" / "t2m_mean" / "2010.nc"
-            if probe.exists():          # never re-download (compute nodes are usually offline)
-                stamp("SKIP: download_worldtensor.py (probe files on disk)")
+        module = "energysiting.tech" if name == "tech" else f"energysiting.setup.{name}"
+        if name == "worldtensor":
+            from energysiting.setup import worldtensor
+            if worldtensor.ready():
+                stamp("SKIP: worldtensor download (manifest and files present)")
                 continue
-            r = subprocess.run([sys.executable, "syntax/download_worldtensor.py", "--workers", "2"],
-                               cwd=config.ROOT, check=False)
-            if r.returncode != 0:
-                print("  WARNING: WorldTensor download failed (no internet on this node?). "
-                      "Run `python -m energysiting.setup.fetch` on a login node first.")
+            try:
+                run_module_raw(module, "download")
+            except Exception as e:  # noqa: BLE001
+                sys.exit(f"WorldTensor inputs missing and download failed ({e}).\n"
+                         "Run `python -m energysiting.setup.fetch` on a node with internet first.")
             continue
-        if name == "stack":
-            ok = False
-            if not force and (config.DERIVED / "covStack.tif").exists():
-                from energysiting import raster
-                try:
-                    ok = raster.read(config.DERIVED / "covStack.tif", cache=False).data.shape[0] == 102
-                except Exception:
-                    ok = False
-            if ok:
-                stamp("SKIP: stack (covStack.tif has 102 layers)")
+        if name == "make_spatial_lag" and not force:
+            from energysiting.setup import make_spatial_lag
+            if make_spatial_lag.up_to_date():
+                stamp("SKIP: make_spatial_lag (pre-2017 binary lag already built)")
                 continue
-        elif outputs and not force and all(p.exists() for p in outputs):
+        if name == "stack" and not force:
+            from energysiting.setup import stack
+            if stack.up_to_date():
+                stamp(f"SKIP: stack (covStack.tif has {len(config.COV_LAYERS)} layers and is newer than its inputs)")
+                continue
+        if outputs and not force and all(p.exists() for p in outputs):
             stamp(f"SKIP: {name} ({len(outputs)}/{len(outputs)} outputs exist)")
             continue
-        run_module(name, "energysiting.tech" if name == "tech" else f"energysiting.setup.{name}")
+        run_module(name, module)
+
+
+def run_module_raw(module, func):
+    stamp(f"Running: {module}.{func}")
+    getattr(importlib.import_module(module), func)()
 
 
 def main():

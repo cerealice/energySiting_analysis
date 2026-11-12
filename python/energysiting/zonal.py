@@ -4,7 +4,7 @@
   fasterize rule (cells whose centre falls inside the circle; later ids
   overwrite earlier ones).
 * Presence zones: the <tech>_hull_existing.tif raster (cell value = plant id).
-* For every zone, the mean of each of the 105 layers (102 shared + env/cf/lag),
+* For every zone, the mean of each of the stack layers (108 shared, or R's 102, + env/cf/lag),
   NA-ignoring — raster::zonal(fun = "mean", na.rm = TRUE).
 
 Output: derived/py/bg_cov_<tech>.csv and existing_cov_<tech>.csv
@@ -57,7 +57,7 @@ def run():
     base = raster.read(config.BASE_RASTER)
     for tech in config.TECHS:
         iv = np.concatenate([cov.data, tech_stacks[tech].data], axis=0)
-        names = config.COV_LAYERS + config.TECH_LAYERS
+        names = cov.names + config.TECH_LAYERS
         ab = pd.read_csv(config.OUT / f"absence_{tech}.csv")
         zones_ab = burn_circles(ab, base.grid)
         zones_ex = raster.read(config.DERIVED / f"{tech}_hull_existing.tif").band()

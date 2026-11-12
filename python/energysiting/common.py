@@ -35,8 +35,10 @@ def impute_dat(df: pd.DataFrame, medians: pd.Series | None = None) -> pd.DataFra
 
 
 def load_stacks():
-    """covStack (102 layers), tech stacks (env, cf, lag) and future tx/sub."""
-    cov = raster.read(config.DERIVED / "covStack.tif", names=config.COV_LAYERS)
+    """covStack (108 layers from the Python setup, or R's 102), tech stacks
+    (env, cf, lag) and future tx/sub."""
+    cov = raster.read(config.DERIVED / "covStack.tif")
+    cov.names = config.cov_layout(cov.data.shape[0])
     fut = raster.read(config.DERIVED / "future.tif", names=config.FUTURE_LAYERS)
     tech = {t: raster.read(config.DERIVED / f"{t}_covStack.tif", names=config.TECH_LAYERS)
             for t in config.TECHS}

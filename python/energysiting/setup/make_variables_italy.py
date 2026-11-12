@@ -112,16 +112,7 @@ def run():
         r = rasterize(nuts1[nuts1.NUTS_ID == nid], g, 1.0, fill=0.0)
         save_var(mask_base(r, b), f"{out}.tif", b)
 
-    print("8. Spatial lag (50 km circular focal mean)")
-    rad = int(50000 // g.res)
-    yy, xx = np.mgrid[-rad:rad + 1, -rad:rad + 1]
-    w = ((xx ** 2 + yy ** 2) * g.res ** 2 <= 50000 ** 2).astype(float)
-    w /= w.sum()                                    # terra::focalMat(type = "circle")
-    for tech in ("solar", "wind"):
-        ex = raster.read(config.DERIVED / f"{tech}_hull_existing.tif").band()
-        ex = np.where(np.isfinite(ex), ex, 0.0)
-        lag = ndimage.convolve(ex, w, mode="constant", cval=0.0)
-        save_var(mask_base(lag, b), f"{tech}_lag.tif", b)
+    # 8. Spatial lag → separate step make_spatial_lag.py (pre-2017 plants, 0/1)
 
     print("9. FER incentive (national placeholder)")
     save_var(b.band().copy(), "fer_incentive.tif", b)

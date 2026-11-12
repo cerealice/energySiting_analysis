@@ -13,9 +13,11 @@ The R code is left untouched next to it so the two can be compared.
 | `make_zenodo_socioeconomic.R` | `setup/make_zenodo_socioeconomic.py` | GDP pc, institutional quality |
 | `make_natura2000.R` | `setup/make_natura2000.py` | 0.7 × Natura-2000 proximity + 0.3 × slope |
 | `make_nuts2_regions.R` | `setup/make_nuts2_regions.py` | 21 NUTS-2 indicator rasters |
-| `make_worldtensor.R` | `setup/make_worldtensor.py` | ERA5 / LUH3 / NDVI from WorldTensor NetCDFs |
+| `make_worldtensor.R` | `setup/make_worldtensor.py` | WorldTensor layers = mean of the latest 5 years (see below) |
+| `download_worldtensor.py` | `setup/worldtensor.py` | resolves the latest years in the Zenodo archives, extracts them, writes `manifest.json` |
+| (section 8 of `make_variables_italy.R`) | `setup/make_spatial_lag.py` | spatial lag from pre-2017 plants, 0/1 |
 | `make_worldclim.R` | `setup/make_worldclim.py` | WorldClim BIO1–19 |
-| `stack.R` | `setup/stack.py` | 102-layer z-scored stack + tech + future stacks |
+| `stack.R` | `setup/stack.py` | 108-layer z-scored stack (R's 102 + 6 WorldTensor) + tech + future stacks |
 | `tech.R` | `tech.py` | GEM trackers + RSE Atlante → presence rasters |
 | `absence.R` | `absence.py` | pseudo-absences by NUTS-2, 10 seeds |
 | `zonal.R` | `zonal.py` | zone means of the 105 layers |
@@ -58,7 +60,7 @@ bash python/run_all.sh            # login node: create env + download inputs + s
 downloads everything the setup needs (~17 GB; resumable) with
 `python -m energysiting.setup.fetch`, then submits itself with `bsub` or
 `sbatch`. The job runs `python python/run_all.py --force-setup`, i.e. it
-rebuilds the base raster, every covariate layer, the 102-layer stack, the
+rebuilds the base raster, every covariate layer, the 108-layer stack, the
 presence/absence data, all models and figures — fully offline. Edit the
 `#BSUB` / `#SBATCH` lines (queue, project, walltime) and, if needed, set
 `PY_MODULE` (e.g. `python/3.11`). Sub-commands: `prepare`, `submit`, `check`, `local`.
@@ -85,6 +87,31 @@ if `rasterio` is missing, GeoTIFFs (including terra's LZW-compressed ones) are
 read by a pure-Python fallback in `energysiting/raster.py`. The setup steps and
 `tech.py` require the geospatial stack (rasterio, geopandas, pyogrio with GDAL's
 OSM driver, xarray + netCDF4).
+
+## Predictors (Python version)
+
+| | solar | wind |
+|---|---|---|
+| R's `region_model` | 96 | 96 |
+| + WorldTensor: aerosol optical depth, PM2.5 (CAMS EAC4), population density, harmonised nighttime lights, GMTED elevation and slope | +6 | +6 |
+| + derived ERA5 wind: wind speed 10/100 m, power density 100 m, 100 m speed variability | – | +4 |
+| **total** | **102** | **106** |
+
+**WorldTensor time window.** Every time-varying WorldTensor layer is the mean of
+the latest 5 years that variable has in the archive (`ES_WT_YEARS`), resolved
+from the archive index at download time: ERA5 2021–2025, LUH3 2020–2024, NDVI
+2021–2025, CAMS 2020–2024, population density 2016–2020, nighttime lights
+2014–2018 (the harmonised series ends in 2018). R averaged ERA5 over 2000–2020
+and used LUH3 for 2020 only. All WorldTensor layers are on a 0.25° (~25 km)
+grid, so `wt_slope_mean` / `wt_population_density` describe the surrounding
+region, while `slope` / `pop` (1 km SRTM / GPW) describe the site.
+
+**Spatial lag.** Share of 1 km cells within 50 km holding a tracker plant that
+was already operating before 2017 (0/1). R averaged a raster of plant ID
+numbers built from the same >= 2017 plants the model predicts.
+
+Toggles: `ES_WT_EXTRA=0` (drop the 6 WorldTensor layers), `ES_WIND_ERA5_DERIVED=0`,
+`ES_DROP_VARS=a,b`, `ES_WT_YEARS=n`.
 
 ## Deliberate differences from the R code
 

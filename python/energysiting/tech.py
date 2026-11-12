@@ -8,6 +8,7 @@ Both are enriched with RSE municipal installed capacity (≥ 1 MW comuni whose
 centroid is > 500 m from any tracker plant).
 
 Writes (shared with R): derived/<tech>_hull_existing{,_mask}.tif, <tech>_hull_existing.csv
+Python only:            derived/<tech>_pre2017.tif (0/1 plants operating before 2017)
 Requires geopandas + rasterio.
 """
 from __future__ import annotations
@@ -100,6 +101,13 @@ def run_tech(tech, regions, b):
     l = mask_base(rasterize(loc, b.grid, field="unique_id", touches=True), b)
     raster.write(config.DERIVED / f"{tech}_hull_existing_mask.tif", m, b.grid, ["unique_id"])
     raster.write(config.DERIVED / f"{tech}_hull_existing.tif", l, b.grid, ["unique_id"])
+    # Plants already operating before 2017 (0/1) — source of the spatial-lag
+    # predictor. Using only pre-2017 plants keeps the modelled presences
+    # (start year >= 2017) out of their own predictor.
+    old = sf[sf["Start year"] < 2017]
+    pre = mask_base(np.where(np.isfinite(rasterize(old, b.grid, 1.0, touches=True)), 1.0, 0.0), b)
+    raster.write(config.DERIVED / f"{tech}_pre2017.tif", pre, b.grid, ["pre2017"])
+    print(f"{tech}: {len(old)} tracker plants operating before 2017 → {int(np.nansum(pre))} cells")
     loc.drop(columns="geometry").to_csv(config.DERIVED / f"{tech}_hull_existing.csv", index=False)
     loc[["unique_id", "geometry"]].to_file(config.OUT / f"{tech}_locations.gpkg")
 
