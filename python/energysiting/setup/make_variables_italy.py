@@ -5,7 +5,7 @@ environmental score.
 Downloads mirror the R ``geodata`` / ``osmextract`` sources:
   * SRTM 30″ DEM            geodata.ucdavis.edu/geodata/elv/ITA_elv_msk.tif
   * WorldPop/GPW 2020 30″   geodata.ucdavis.edu/geodata/pop/...
-  * WorldClim 2.1 srad/wind geodata.ucdavis.edu/climate/worldclim/2_1/base/...
+  (capacity factors → make_resource.py: Global Solar Atlas / Global Wind Atlas)
   * ESA WorldCover 30″      geodata.ucdavis.edu/geodata/landuse/WorldCover_<var>_30s.tif
   * OSM Italy PBF           download.geofabrik.de (read with GDAL's OSM driver)
 """
@@ -77,18 +77,7 @@ def run():
     save_var(d_tx, "transmission_110_wPlanned.tif", b)   # planned lines not in OSM: placeholder
     # substations → separate step make_substations.py (needs the power-area OSM config)
 
-    print("4-5. Capacity-factor proxies (WorldClim srad / wind)")
-    for var, out in (("srad", "solar_capacity.tif"), ("wind", "wind_capacity.tif")):
-        z = download(WC_URL.format(var=var), cache / "worldclim" / f"wc2.1_30s_{var}.zip")
-        months = []
-        for m in range(1, 13):
-            tif = cache / "worldclim" / f"wc2.1_30s_{var}_{m:02d}.tif"
-            if not tif.exists():
-                unzip_member(z, tif.name, tif)
-            months.append(snap(tif))
-        with np.errstate(invalid="ignore"), warnings.catch_warnings():
-            warnings.simplefilter("ignore", RuntimeWarning)   # cells NA in all 12 months stay NA
-            save_var(mask_base(np.nanmean(months, axis=0), b), out, b)
+    # 4-5. Capacity factor → make_resource.py (Global Solar Atlas PVOUT / Global Wind Atlas)
 
     print("6. Land use / land cover (ESA WorldCover fractions)")
     stack = []

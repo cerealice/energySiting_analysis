@@ -136,7 +136,7 @@ def run():
         plot_blocks(config.FIG / f"spatial_blocks_{tech}.png", xy, y, fold_id, size, base.grid, edges,
                     f"{tech.capitalize()} — spatial blocks ({size / 1000:.0f} km, k = 5)")
 
-        X = dat[[v for v in config.model_vars(tech) if v in dat.columns]]
+        X = dat[config.model_vars(tech, dat.columns)]
         rnd = pd.read_csv(config.OUT / f"resamples_{tech}.csv")
         for key, label in (("xg", "GBM"), ("rf", "RF")):
             tr = train(key, X, y, folds, seed=config.SEED, n_jobs=config.n_jobs())

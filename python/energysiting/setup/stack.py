@@ -1,5 +1,6 @@
-"""stack.R — assemble the 108-layer covariate stack (R's 102 + 6 WorldTensor layers;
-continuous layers z-scored)
+"""stack.R — assemble the 86-layer covariate stack (see config.COV_LAYERS: CHELSA,
+ERA5-Land, selected ERA5, LUH3, WorldTensor extras, resource layers, land cover,
+NUTS-2; continuous layers z-scored)
 plus the solar / wind technology stacks and the future-infrastructure stack."""
 from __future__ import annotations
 
@@ -7,22 +8,13 @@ import numpy as np
 
 from .. import config, raster
 
-FILES = (
-    ["transmission_110_qgis", "roads_qgis", "substations_110_qgis", "slope", "pop_density",
-     "svi_unemp", "svi_foreignborn", "svi_pov", "zenodo_gdp_pc", "zenodo_inst_quality"]
-    + [f"wclim_bio{i:02d}" for i in range(1, 20)]
-    + ["era5_" + n for n in config.CONT_LAYERS[29:53]]
-    + config.CONT_LAYERS[53:66]
-    + ["era5_ws10_mean", "era5_ws100_mean", "era5_wpd100", "era5_clearness", "era5_direct_frac",
-       "era5_ssrd_iav", "era5_ws100_iav"]
-    + config.WT_EXTRA_LAYERS
-    + ["lulc_forest", "lulc_grassland", "lulc_shrubland", "lulc_riparian", "lulc_sparselyvegetated",
-       "lulc_agricultural", "lulc_developed", "lulc_other"]
-    + config.NUTS2_LAYERS
-)
-# CONT_LAYERS[29:53] already carry the "era5_" prefix
-FILES = [f.replace("era5_era5_", "era5_") for f in FILES]
-assert len(FILES) == len(config.COV_LAYERS) == 108
+# layer name → file in data/processed_data/variables (identity unless listed)
+FILE_OF = {"tx": "transmission_110_qgis", "roads": "roads_qgis", "sub": "substations_110_qgis",
+           "pop": "pop_density", "unemploy": "svi_unemp", "foreignborn": "svi_foreignborn",
+           "poverty": "svi_pov", "gdp_pc": "zenodo_gdp_pc", "inst_quality": "zenodo_inst_quality",
+           "lulc_sparse": "lulc_sparselyvegetated", "lulc_agriculture": "lulc_agricultural"}
+FILES = [FILE_OF.get(l, l) for l in config.COV_LAYERS]
+assert len(FILES) == len(config.COV_LAYERS) == 86
 
 
 def input_paths():
@@ -70,7 +62,7 @@ def build(files, names, scale_up_to, out):
 
 def run():
     config.ensure_dirs()
-    build(FILES, config.COV_LAYERS, len(config.CONT_LAYERS_ALL), config.DERIVED / "covStack.tif")
+    build(FILES, config.COV_LAYERS, len(config.CONT_LAYERS_V2), config.DERIVED / "covStack.tif")
     for tech in ("solar", "wind"):
         build([f"env_impactScore_{tech}", f"{tech}_capacity", f"{tech}_lag"],
               ["Environmental score", "Capacity factor", "Spatial lag"], 3,

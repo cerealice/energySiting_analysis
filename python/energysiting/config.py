@@ -101,16 +101,38 @@ WT_EXTRA_LAYERS = ["aq_aod550_mean", "aq_pm2p5_mean",            # CAMS EAC4 air
                    "wt_population_density", "wt_ntl_harmonized",  # human systems
                    "wt_elevation_mean", "wt_slope_mean"]          # GMTED2010 topography (static)
 CONT_LAYERS_ALL = CONT_LAYERS + WT_EXTRA_LAYERS                    # 73 + 6 = 79
-COV_LAYERS = CONT_LAYERS_ALL + LULC_LAYERS + NUTS2_LAYERS          # 79 + 8 + 21 = 108
+COV_LAYERS_WT = CONT_LAYERS_ALL + LULC_LAYERS + NUTS2_LAYERS       # previous Python stack: 108
 COV_LAYERS_R = CONT_LAYERS + LULC_LAYERS + NUTS2_LAYERS            # R's covStack: 102
+
+# ── Climate & resource block (current Python stack) ──────────────────────────
+# One source per role, no overlapping variables:
+#   CHELSA v2.1 BIO1–19 (1 km, 1981–2010)      climate normals (replaces WorldClim)
+#   Global Solar Atlas PVOUT / Global Wind Atlas → the `cf` layer (resource)
+#   Global Wind Atlas 100 m mean wind speed      wind resource (wind model)
+#   CERRA 100 m wind speed, SD of annual means   recent variability (wind model)
+#   ERA5-Land (0.1°) solar radiation, pressure   recent conditions at 9 km
+#   ERA5 (0.25°) only what the others lack       gust, clear-sky direct radiation,
+#                                                cloud cover, boundary layer, CAPE
+import datetime as _dt
+CLIMATE_YEARS = list(range(_dt.date.today().year - 5, _dt.date.today().year))  # last 5 complete years
+INFRA_SOCIO = CONT_LAYERS[:10]
+CHELSA_LAYERS = [f"chelsa_bio{i:02d}" for i in range(1, 20)]
+ERA5_KEEP = ["era5_i10fg_mean", "era5_cdir_sum", "era5_tcc_mean", "era5_blh_mean", "era5_cape_mean"]
+ERA5LAND_LAYERS = ["era5land_ssrd", "era5land_sp"]
+LUH3_NDVI = CONT_LAYERS[53:66]
+WIND_RESOURCE = ["gwa_ws100", "cerra_ws100_iav"]
+CONT_LAYERS_V2 = (INFRA_SOCIO + CHELSA_LAYERS + ERA5_KEEP + ERA5LAND_LAYERS + LUH3_NDVI
+                  + WT_EXTRA_LAYERS + WIND_RESOURCE)                # 10+19+5+2+13+6+2 = 57
+COV_LAYERS = CONT_LAYERS_V2 + LULC_LAYERS + NUTS2_LAYERS           # 57 + 8 + 21 = 86
 
 
 def cov_layout(n_bands: int) -> list:
-    """Layer names of a covStack.tif with n_bands layers (Python 108 or R 102)."""
-    for layout in (COV_LAYERS, COV_LAYERS_R):
+    """Layer names of a covStack.tif with n_bands layers (current 86, previous 108, R 102)."""
+    for layout in (COV_LAYERS, COV_LAYERS_WT, COV_LAYERS_R):
         if n_bands == len(layout):
             return layout
-    raise ValueError(f"covStack.tif has {n_bands} layers; expected {len(COV_LAYERS)} or {len(COV_LAYERS_R)}")
+    raise ValueError(f"covStack.tif has {n_bands} layers; expected {len(COV_LAYERS)}, "
+                     f"{len(COV_LAYERS_WT)} or {len(COV_LAYERS_R)}")
 
 
 # ── WorldTensor (Zenodo 10.5281/zenodo.19047618) ──────────────────────────────
@@ -160,24 +182,36 @@ assert len(MODEL_VARS) == 96
 WIND_ERA5_DERIVED = ["era5_ws10_mean", "era5_ws100_mean", "era5_wpd100", "era5_ws100_iav"]
 
 
-def model_vars(tech: str) -> list:
-    """Predictors for one technology: R's 96 + 6 extra WorldTensor layers
-    (+ 4 derived ERA5 wind features for wind) → solar 102, wind 106.
+def model_vars(tech: str, columns=None) -> list:
+    """Predictors for one technology.
 
+    Current climate block (stack has CHELSA layers): solar 85, wind 87 —
+      infrastructure & socioeconomic 10, CHELSA 19, ERA5 5, ERA5-Land 2,
+      LUH3 + NDVI 13, extra WorldTensor 6, land cover 7, NUTS-2 20,
+      [wind: GWA 100 m speed, CERRA variability], env + cf + lag.
+    Legacy block (R's 102- or the 108-layer stack): R's 96 + 6 WorldTensor
+      (+ 4 derived ERA5 wind features for wind).
+
+    ``columns``: the columns available (zonal output); only those are returned,
+    and the block is chosen from them.
+    ES_CLIMATE_SET=legacy   → force the legacy block
     ES_WT_EXTRA=0           → leave out the 6 extra WorldTensor layers
-    ES_WIND_ERA5_DERIVED=0  → leave out the derived ERA5 wind features
+    ES_WIND_ERA5_DERIVED=0  → (legacy) leave out the derived ERA5 wind features
     ES_DROP_VARS=lag,...    → drop predictors (sensitivity runs)
-    Callers keep only the predictors present in their data (an R-built stack has
-    no extra WorldTensor layers).
     """
-    v = list(MODEL_VARS[:-3])
-    if os.environ.get("ES_WT_EXTRA", "1") != "0":
-        v += WT_EXTRA_LAYERS
-    if tech == "wind" and os.environ.get("ES_WIND_ERA5_DERIVED", "1") != "0":
-        v += WIND_ERA5_DERIVED
-    v += TECH_LAYERS
+    cols = set(columns) if columns is not None else set(COV_LAYERS) | set(TECH_LAYERS)
+    wt_extra = WT_EXTRA_LAYERS if os.environ.get("ES_WT_EXTRA", "1") != "0" else []
+    if "chelsa_bio01" in cols and os.environ.get("ES_CLIMATE_SET", "v2") != "legacy":
+        v = (INFRA_SOCIO + CHELSA_LAYERS + ERA5_KEEP + ERA5LAND_LAYERS + LUH3_NDVI + wt_extra
+             + LULC_LAYERS[:-1] + [l for l in NUTS2_LAYERS if l != "nuts2_itg2"]
+             + (WIND_RESOURCE if tech == "wind" else []) + TECH_LAYERS)
+    else:
+        v = list(MODEL_VARS[:-3]) + wt_extra
+        if tech == "wind" and os.environ.get("ES_WIND_ERA5_DERIVED", "1") != "0":
+            v += WIND_ERA5_DERIVED
+        v += TECH_LAYERS
     drop = {d.strip() for d in os.environ.get("ES_DROP_VARS", "").split(",") if d.strip()}
-    return [x for x in v if x not in drop]
+    return [x for x in v if x not in drop and x in cols]
 
 # ── Display labels (modeling.R var_labels / imp recode) ───────────────────────
 VAR_LABELS = {
@@ -225,6 +259,27 @@ VAR_LABELS = {
     "aq_aod550_mean": "Aerosol optical depth (CAMS)", "aq_pm2p5_mean": "PM2.5 (CAMS)",
     "wt_population_density": "Population density (WT)", "wt_ntl_harmonized": "Nighttime lights (WT)",
     "wt_elevation_mean": "Elevation (GMTED)", "wt_slope_mean": "Terrain slope (GMTED)",
+    "chelsa_bio01": "Annual mean temp (CHELSA)",
+    "chelsa_bio02": "Diurnal temp range (CHELSA)",
+    "chelsa_bio03": "Isothermality (CHELSA)",
+    "chelsa_bio04": "Temp seasonality (CHELSA)",
+    "chelsa_bio05": "Max temp warmest (CHELSA)",
+    "chelsa_bio06": "Min temp coldest (CHELSA)",
+    "chelsa_bio07": "Annual temp range (CHELSA)",
+    "chelsa_bio08": "Temp wettest qtr (CHELSA)",
+    "chelsa_bio09": "Temp driest qtr (CHELSA)",
+    "chelsa_bio10": "Temp warmest qtr (CHELSA)",
+    "chelsa_bio11": "Temp coldest qtr (CHELSA)",
+    "chelsa_bio12": "Annual precip (CHELSA)",
+    "chelsa_bio13": "Precip wettest mo (CHELSA)",
+    "chelsa_bio14": "Precip driest mo (CHELSA)",
+    "chelsa_bio15": "Precip seasonality (CHELSA)",
+    "chelsa_bio16": "Precip wettest qtr (CHELSA)",
+    "chelsa_bio17": "Precip driest qtr (CHELSA)",
+    "chelsa_bio18": "Precip warmest qtr (CHELSA)",
+    "chelsa_bio19": "Precip coldest qtr (CHELSA)",
+    "era5land_ssrd": "Solar radiation (ERA5-Land)", "era5land_sp": "Surface pressure (ERA5-Land)",
+    "gwa_ws100": "Wind speed 100m (GWA)", "cerra_ws100_iav": "Wind speed 100m variability (CERRA)",
 }
 # GLM coefficient plot (f2): NUTS-2 dummies collapse to their NUTS-1 macro-region.
 COEF_LABELS = dict(VAR_LABELS)

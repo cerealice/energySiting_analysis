@@ -62,6 +62,19 @@ def describe(var: str, wt: dict) -> dict:
     if var in socio:
         s, r, p = socio[var]
         return dict(group="Socioeconomic", source=s, res=r, period=p)
+    if var.startswith("chelsa_"):
+        return dict(group="Climate — CHELSA", source="CHELSA v2.1 bioclimatic variable", res="1 km (30″)", period="1981–2010 normals")
+    if var.startswith("era5land_"):
+        yrs = config.CLIMATE_YEARS
+        return dict(group="Climate — ERA5-Land", source="ERA5-Land monthly means (Copernicus CDS)",
+                    res="0.1° (~9 km)", period=f"{yrs[0]}–{yrs[-1]} mean")
+    if var == "gwa_ws100":
+        return dict(group="Wind & solar resource", source="Global Wind Atlas v3 mean wind speed at 100 m",
+                    res="250 m (averaged to 1 km)", period="2008–2017 (ERA5 downscaled)")
+    if var == "cerra_ws100_iav":
+        yrs = config.CLIMATE_YEARS
+        return dict(group="Wind & solar resource", source="CERRA 100 m wind speed: SD of annual means",
+                    res="5.5 km", period=f"{yrs[0]}–{yrs[-1]}")
     if var.startswith("wclim_"):
         return dict(group="Climate — WorldClim", source="WorldClim 2.1 bioclimatic variable", res="1 km (30″)", period="1970–2000 normals")
     if var in config.WIND_ERA5_DERIVED:
@@ -89,16 +102,17 @@ def describe(var: str, wt: dict) -> dict:
     if var == "env":
         return dict(group="Technology", source="0.7 × proximity to Natura 2000 + 0.3 × normalised slope", res="1 km", period="Natura 2000 end-2024")
     if var == "cf":
-        return dict(group="Technology", source="'Capacity factor' proxy: WorldClim solar radiation (solar) / wind speed (wind), 12-month mean",
-                    res="1 km", period="1970–2000")
+        return dict(group="Technology", source="Resource: Global Solar Atlas PVOUT (solar) / Global Wind Atlas "
+                    "capacity factor, IEC class II at 100 m (wind)", res="~250 m–1 km (averaged to 1 km)",
+                    period="long-term (GWA 2008–2017)")
     if var == "lag":
         return dict(group="Technology", source="Share of cells within 50 km with a tracker plant operating before 2017 (0/1)",
                     res="1 km", period="< 2017")
     return dict(group="Other", source="", res="", period="")
 
 
-GROUP_ORDER = ["Infrastructure", "Terrain & population", "Socioeconomic", "Climate — WorldClim",
-               "Climate — ERA5", "Climate — ERA5 derived", "Land use — LUH3", "Air quality",
+GROUP_ORDER = ["Infrastructure", "Terrain & population", "Socioeconomic", "Climate — CHELSA",
+               "Climate — WorldClim", "Climate — ERA5-Land", "Climate — ERA5", "Wind & solar resource", "Climate — ERA5 derived", "Land use — LUH3", "Air quality",
                "Human systems", "Land cover", "Regions", "Technology", "Other"]
 
 
@@ -333,7 +347,10 @@ def sec_sources():
             ("OpenStreetMap Italy (Geofabrik)", "plant footprints, turbines, roads, lines, substations", "download"),
             ("RSE Atlante (2021 solar, 2019 wind)", "municipal installed capacity (coverage check / R mode)", "data/ (git)"),
             ("Eurostat GISCO", "country, NUTS, municipality boundaries", "download"),
-            ("geodata.ucdavis.edu", "SRTM DEM, GPWv4 population, WorldClim 2.1, ESA WorldCover", "download"),
+            ("geodata.ucdavis.edu", "SRTM DEM, GPWv4 population, ESA WorldCover", "download"),
+            ("CHELSA v2.1 (WSL)", "bioclimatic normals 1981–2010", "download (Italy window)"),
+            ("Global Solar Atlas / Global Wind Atlas (World Bank)", "PVOUT; wind speed and capacity factor at 100 m", "download"),
+            ("Copernicus CDS: ERA5-Land, CERRA", "radiation, pressure (9 km); 100 m wind variability (5.5 km)", "CDS API (account)"),
             ("ISTAT, MEF", "unemployment, foreign-born share, taxable income", "data/ (git)"),
             ("Zenodo 10.5281/zenodo.11121790", "GDP per capita, institutional quality", "data/ (git)"),
             ("WorldTensor, Zenodo 10.5281/zenodo.19047618", "ERA5, LUH3, NDVI, CAMS, population, NTL, GMTED", "download (manifest.json)"),

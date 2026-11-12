@@ -53,10 +53,9 @@ def run_tech(tech, stacks, base):
     bg = pd.read_csv(config.OUT / f"bg_cov_{tech}.csv").copy()
     bg = bg.assign(group=make_groups(len(bg)))
 
-    wanted = config.model_vars(tech)
-    mv = [v for v in wanted if v in ex.columns]
-    log(f"{tech}: {len(mv)} predictors"
-        + (f" (not in this stack: {', '.join(v for v in wanted if v not in mv)})" if len(mv) < len(wanted) else ""))
+    mv = config.model_vars(tech, ex.columns)
+    block = "current climate block" if "chelsa_bio01" in mv else "legacy climate block (older stack)"
+    log(f"{tech}: {len(mv)} predictors, {block}")
     rst, aic = glm_groups(bg, ex, mv)
     best_group = int(np.argsort(aic, kind="stable")[4]) + 1          # which(aic == sort(aic)[5])
     log(f"{tech}: GLM AIC by group {np.round(aic, 1).tolist()} → using group {best_group}")

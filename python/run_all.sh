@@ -96,7 +96,8 @@ make_env() {
             log "Creating conda env $CONDA_ENV (conda-forge)"
             conda create -y -n "$CONDA_ENV" -c conda-forge python=3.11 \
                 numpy pandas scipy "scikit-learn>=1.8" joblib matplotlib tifffile openpyxl \
-                rasterio geopandas pyogrio shapely pyproj xarray netcdf4 requests pip
+                rasterio geopandas pyogrio shapely pyproj xarray netcdf4 requests pip \
+                cdsapi cfgrib eccodes
         fi
         conda activate "$CONDA_ENV"
         pip install -q remotezip
@@ -111,7 +112,7 @@ make_env() {
     fi
     python - <<'EOF'
 import sys
-import sklearn, rasterio, geopandas, pyogrio, xarray  # noqa: F401
+import sklearn, rasterio, geopandas, pyogrio, xarray, cdsapi, cfgrib  # noqa: F401
 v = tuple(int(x) for x in sklearn.__version__.split(".")[:2])
 assert v >= (1, 8), f"scikit-learn {sklearn.__version__} < 1.8 (Lasso would silently become ridge)"
 drivers = pyogrio.list_drivers()

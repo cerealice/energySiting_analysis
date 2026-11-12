@@ -8,7 +8,8 @@ downloads that are already on disk, so the batch job then runs fully offline.
     python -m energysiting.setup.fetch            # download what is missing
     python -m energysiting.setup.fetch --check    # only report what is missing
 
-Sizes (approx.): WorldClim bio 9.7 GB, srad 2.6 GB, wind 0.7 GB, OSM Italy PBF
+Sizes (approx.): CERRA ~17 GB transferred but ~0.3 GB kept, CHELSA Italy crops ~0.2 GB,
+Global Solar/Wind Atlas Italy ~0.5 GB, ERA5-Land < 0.1 GB, OSM Italy PBF
 2.2 GB, GISCO communes 0.3 GB, WorldTensor selection ~0.5 GB, others < 0.5 GB.
 """
 from __future__ import annotations
@@ -19,7 +20,7 @@ import sys
 from .. import config
 from ._geo import CACHE, GISCO, download
 from .make_natura2000 import SHP as NATURA_SHP
-from .make_variables_italy import DEM_URL, LC_URL, LULC_MAP, PBF_URL, POP_URL, WC_URL
+from .make_variables_italy import DEM_URL, LC_URL, LULC_MAP, PBF_URL, POP_URL
 
 R = config.RAW
 
@@ -39,7 +40,6 @@ def targets():
         (POP_URL, R / "population" / POP_URL.rsplit("/", 1)[1]),
         (PBF_URL, R / "geofabrik_italy-latest.osm.pbf"),
     ]
-    t += [(WC_URL.format(var=v), R / "worldclim" / f"wc2.1_30s_{v}.zip") for v in ("bio", "srad", "wind")]
     t += [(LC_URL.format(var=v), R / "landuse" / f"WorldCover_{v}_30s.tif") for v in LULC_MAP.values()]
     return t
 
@@ -84,6 +84,28 @@ def main():
     else:
         print("  WorldTensor: resolving the latest years in the archives and extracting ...")
         worldtensor.download()
+
+    # climate & resource sources (CHELSA, Global Solar/Wind Atlas, ERA5-Land, CERRA)
+    from . import make_cerra, make_chelsa, make_era5land, make_resource
+    from ._cds import HELP as CDS_HELP, has_credentials
+    if a.check:
+        for name, mod in (("CHELSA BIO1–19 Italy crops", make_chelsa), ("Global Solar/Wind Atlas", make_resource),
+                          ("ERA5-Land monthly means", make_era5land), ("CERRA 100 m wind (60 months)", make_cerra)):
+            if mod.ready():
+                print(f"  ok        {name}")
+            else:
+                problems.append(f"not downloaded yet: {name}")
+    else:
+        make_chelsa.fetch()
+        problems += make_resource.fetch() or []
+        if has_credentials():
+            for name, mod in (("ERA5-Land", make_era5land), ("CERRA", make_cerra)):
+                try:
+                    mod.fetch()
+                except Exception as e:  # noqa: BLE001
+                    problems.append(f"{name} download failed: {e}\n      (re-run this step to resume)")
+        else:
+            problems.append(CDS_HELP)
 
     if not NATURA_SHP.exists():
         problems.append(

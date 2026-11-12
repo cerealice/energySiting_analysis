@@ -16,8 +16,10 @@ The R code is left untouched next to it so the two can be compared.
 | `make_worldtensor.R` | `setup/make_worldtensor.py` | WorldTensor layers = mean of the latest 5 years (see below) |
 | `download_worldtensor.py` | `setup/worldtensor.py` | resolves the latest years in the Zenodo archives, extracts them, writes `manifest.json` |
 | (section 8 of `make_variables_italy.R`) | `setup/make_spatial_lag.py` | spatial lag from pre-2017 plants, 0/1 |
-| `make_worldclim.R` | `setup/make_worldclim.py` | WorldClim BIO1–19 |
-| `stack.R` | `setup/stack.py` | 108-layer z-scored stack (R's 102 + 6 WorldTensor) + tech + future stacks |
+| `make_worldclim.R` | `setup/make_chelsa.py` | CHELSA v2.1 BIO1–19 1981–2010 (replaces WorldClim; Italy window read remotely) |
+| – | `setup/make_resource.py` | Global Solar Atlas PVOUT, Global Wind Atlas 100 m speed + capacity factor |
+| – | `setup/make_era5land.py`, `setup/make_cerra.py` | ERA5-Land radiation / pressure; CERRA 100 m wind variability (Copernicus CDS) |
+| `stack.R` | `setup/stack.py` | 86-layer z-scored stack + tech + future stacks |
 | `tech.R` | `tech.py` + `osm_plants.py` | GEM trackers + OSM plant footprints → presence rasters (RSE centroids optional) |
 | (substations in `make_variables_italy.R`) | `setup/make_substations.py` | substation distance incl. OSM substation areas |
 | `absence.R` | `absence.py` | pseudo-absences by NUTS-2, 10 seeds |
@@ -119,12 +121,30 @@ substations mapped as areas to the substation-distance layer.
 
 ## Predictors (Python version)
 
-| | solar | wind |
-|---|---|---|
-| R's `region_model` | 96 | 96 |
-| + WorldTensor: aerosol optical depth, PM2.5 (CAMS EAC4), population density, harmonised nighttime lights, GMTED elevation and slope | +6 | +6 |
-| + derived ERA5 wind: wind speed 10/100 m, power density 100 m, 100 m speed variability | – | +4 |
-| **total** | **102** | **106** |
+| block | source | resolution, period | solar | wind |
+|---|---|---|---|---|
+| infrastructure, socioeconomic | OSM, ISTAT, MEF, Zenodo | 1 km / admin units | 10 | 10 |
+| climate normals | **CHELSA v2.1** BIO1–19 (replaces WorldClim) | 1 km, 1981–2010 | 19 | 19 |
+| recent climate | **ERA5-Land** solar radiation, surface pressure | 9 km, last 5 years | 2 | 2 |
+| what only ERA5 has | ERA5 gust, clear-sky direct radiation, cloud cover, boundary layer, CAPE | 25 km, last 5 years | 5 | 5 |
+| land use | LUH3 states + MODIS NDVI | 25 km, last 5 years | 13 | 13 |
+| WorldTensor extras | aerosols, PM2.5, population, nighttime lights, GMTED elevation & slope | 25 km | 6 | 6 |
+| land cover, regions | ESA WorldCover, NUTS-2 | 1 km | 27 | 27 |
+| wind resource | **Global Wind Atlas** 100 m mean speed; **CERRA** 100 m speed variability | 250 m (2008–2017); 5.5 km (last 5 years) | – | 2 |
+| technology | env score; **cf** = Global Solar Atlas PVOUT (solar) / Global Wind Atlas capacity factor IEC II (wind); spatial lag | 1 km | 3 | 3 |
+| **total** | | | **85** | **87** |
+
+Dropped against the previous version: WorldClim BIO (→ CHELSA), ERA5 temperature /
+precipitation / evaporation / runoff (covered by CHELSA), ERA5 10 m and 100 m U/V
+and the 4 derived wind features (→ Global Wind Atlas / CERRA), WorldClim
+radiation / wind as `cf` (→ Global Solar / Wind Atlas). `ES_CLIMATE_SET=legacy`
+uses the previous block on older stacks; an R-built 102-layer stack is detected
+automatically.
+
+ERA5-Land and CERRA come from the Copernicus Climate Data Store: create a free
+account, accept both dataset licences, and put the token in `~/.cdsapirc` on the
+login node (`fetch` prints the steps). CERRA is fetched one month at a time
+(queued at the CDS, resumable) and reduced to monthly means as it arrives.
 
 **WorldTensor time window.** Every time-varying WorldTensor layer is the mean of
 the latest 5 years that variable has in the archive (`ES_WT_YEARS`), resolved

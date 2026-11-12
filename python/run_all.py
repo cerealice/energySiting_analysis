@@ -57,7 +57,10 @@ SETUP = [
     ("make_nuts2_regions", [V / f"{l}.tif" for l in config.NUTS2_LAYERS]),
     ("worldtensor", None),               # download (needs internet) unless manifest + files present
     ("make_worldtensor", None),          # rebuilds only layers whose source years changed
-    ("make_worldclim", [V / f"wclim_bio{i:02d}.tif" for i in range(1, 20)]),
+    ("make_chelsa", [V / f"{l}.tif" for l in config.CHELSA_LAYERS]),
+    ("make_resource", [V / "solar_capacity.tif", V / "wind_capacity.tif", V / "gwa_ws100.tif"]),
+    ("make_era5land", [V / f"{l}.tif" for l in config.ERA5LAND_LAYERS]),
+    ("make_cerra", [V / "cerra_ws100_iav.tif"]),
     ("stack", None),                     # rebuilt when any input layer is newer
 ]
 
