@@ -46,8 +46,14 @@ def up_to_date():
     return min(o.stat().st_mtime for o in outs) >= newest_in
 
 
-def zscore(a):
-    return (a - np.nanmean(a)) / np.nanstd(a, ddof=1)       # terra::global sd = sample sd
+def zscore(a, name=""):
+    sd = np.nanstd(a, ddof=1)                                # terra::global sd = sample sd
+    if not np.isfinite(sd) or sd == 0:
+        # e.g. luh3_c4per (no C4 perennial crops in Italy): z-score undefined → NA,
+        # as in R; the models impute it to a constant and it carries no signal
+        print(f"  note: {name} is constant over Italy → stored as NA")
+        return np.full_like(a, np.nan)
+    return (a - np.nanmean(a)) / sd
 
 
 def build(files, names, scale_up_to, out):
@@ -57,7 +63,7 @@ def build(files, names, scale_up_to, out):
         r = raster.read(config.VAR_PATH / f"{f}.tif", cache=False)
         grid = r.grid
         a = r.band().astype("float64")
-        layers.append(zscore(a) if i < scale_up_to else a)
+        layers.append(zscore(a, names[i]) if i < scale_up_to else a)
     raster.write(out, np.stack(layers), grid, names)
     print("Saved:", out)
 

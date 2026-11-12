@@ -14,6 +14,7 @@ never leaves stale 2000–2020 layers behind.
 from __future__ import annotations
 
 import json
+import warnings
 
 import numpy as np
 import xarray as xr
@@ -93,7 +94,9 @@ def run():
         if out.exists() and state.get(name) == source_keys:
             print("Up to date:", out.name)
             return
-        with np.errstate(invalid="ignore", divide="ignore"):
+        with np.errstate(invalid="ignore", divide="ignore"), warnings.catch_warnings():
+            # coastal cells outside the 0.25° land grid are NA in every year: expected
+            warnings.simplefilter("ignore", RuntimeWarning)
             r = fn()
         if na_fill is not None:
             r = mask_base(np.where(np.isnan(r), na_fill, r), b)

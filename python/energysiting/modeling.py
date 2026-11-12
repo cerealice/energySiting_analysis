@@ -50,8 +50,8 @@ def glm_groups(bg: pd.DataFrame, ex: pd.DataFrame, mv: list):
 def run_tech(tech, stacks, base):
     t = config.TECHS[tech]
     ex = pd.read_csv(config.OUT / f"existing_cov_{tech}.csv")
-    bg = pd.read_csv(config.OUT / f"bg_cov_{tech}.csv")
-    bg["group"] = make_groups(len(bg))
+    bg = pd.read_csv(config.OUT / f"bg_cov_{tech}.csv").copy()
+    bg = bg.assign(group=make_groups(len(bg)))
 
     wanted = config.model_vars(tech)
     mv = [v for v in wanted if v in ex.columns]
