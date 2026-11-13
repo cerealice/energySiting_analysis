@@ -113,9 +113,19 @@ make_env() {
     if [[ "${ES_EMBEDDINGS-unset}" != "" ]]; then         # NN embeddings (optional; ES_EMBEDDINGS="" to skip)
         log "Installing the geospatial embeddings wrapper (CPU torch)"
         use_certifi
-        python -c "import torch" 2>/dev/null || pip install -q torch --index-url https://download.pytorch.org/whl/cpu
+        python -c "import torch, torchvision" 2>/dev/null \
+            || pip install -q torch torchvision --index-url https://download.pytorch.org/whl/cpu
         pip install -q -r python/requirements-embeddings.txt \
             || log "WARNING: embeddings wrapper not installed — the NN-embeddings step will be skipped"
+        # torch and torchvision must be built for each other; a torchvision pulled from
+        # PyPI for a different torch fails with "operator torchvision::nms does not exist"
+        if ! python -c "import torch, torchvision; torchvision.ops.nms" 2>/dev/null; then
+            log "torch/torchvision mismatch — reinstalling a matching CPU pair"
+            pip install -q --force-reinstall --no-deps torch torchvision \
+                --index-url https://download.pytorch.org/whl/cpu
+        fi
+        python -c "import torch, torchvision; torchvision.ops.nms; print(f'torch {torch.__version__}  torchvision {torchvision.__version__}')" \
+            || log "WARNING: torch/torchvision still broken — the NN-embeddings step will be skipped"
     fi
     python - <<'EOF'
 import sys
