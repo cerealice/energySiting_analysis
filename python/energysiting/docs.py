@@ -305,6 +305,12 @@ def sec_results():
         if info is not None:
             out.append("<p class='small muted'>Block size: " + ", ".join(
                 f"{r.iloc[0]} {float(r['block']) / 1000:.0f} km" for _, r in info.iterrows()) + "</p>")
+    sens = _csv("sensitivity_summary.csv")
+    if sens is not None:
+        out += ["<h3>Leakage sensitivity (mean AUC; Δ = change when the predictors are dropped)</h3>",
+                "<p class='small muted'>GBM and RF refitted on the same folds without predictors that may "
+                "see the plants (WorldCover &ldquo;Developed&rdquo; maps PV farms as built-up). A large drop means "
+                "the full model leaned on them.</p>", _table(sens)]
     thr = _csv("threshold_metrics.csv")
     if thr is not None:
         out += ["<details><summary>Precision / recall / F1 / PR-AUC</summary>", _table(thr), "</details>"]
@@ -329,7 +335,8 @@ def sec_results():
 
 def sec_figures():
     figs = [("f3.png", "Suitability maps and regional means"), ("f_performance_roc.png", "AUC by model"),
-            ("f_spatial_cv_comparison.png", "Random vs spatial CV"), ("f_varimp.png", "Variable importance"),
+            ("f_spatial_cv_comparison.png", "Random vs spatial CV"),
+            ("f_sensitivity.png", "Leakage sensitivity"), ("f_varimp.png", "Variable importance"),
             ("f2.png", "GLM coefficients and importance"), ("f4.png", "Regional random effects"),
             ("f1.png", "Presences and pseudo-absences"), ("f_roc_curves.png", "ROC curves"),
             ("f_pr_curves.png", "Precision–recall curves")]

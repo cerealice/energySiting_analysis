@@ -27,6 +27,7 @@ The R code is left untouched next to it so the two can be compared.
 | `modeling.R` | `modeling.py` + `learners.py` + `glm.py` | 10-group GLMs, 5 learners × 10-fold CV, maps |
 | `performance.R` | `performance.py` | ROC/Sens/Spec table, Wilcoxon, PR/ROC curves |
 | `spatial_cv.R` | `spatial_cv.py` | variogram range, spatial blocks, GBM/RF re-fit |
+| – (new) | `sensitivity.py` | leakage check: GBM/RF refitted on the same folds without WorldCover "Developed" (`ES_SENSITIVITY=no_developed,no_lag,no_both`) |
 | `data.R` | `data.py` + `glmm.py` | masked maps, NUTS-1 means, random-slope GLMM |
 | `plot.R` | `plot.py` | figures f1–f4 |
 | `run_all.R`, `run_hpc.sh` | `run_all.py`, `run_all.sh` | runner (same skip-if-exists logic); cluster script |

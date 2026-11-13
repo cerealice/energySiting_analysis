@@ -37,6 +37,7 @@ MAIN = [
     ("modeling", "energysiting.modeling", None),
     ("performance", "energysiting.performance", None),
     ("spatial_cv", "energysiting.spatial_cv", None),
+    ("sensitivity", "energysiting.sensitivity", None),   # leakage check: refit without Developed
     ("data", "energysiting.data", None),
     ("plot", "energysiting.plot", None),
 ]
