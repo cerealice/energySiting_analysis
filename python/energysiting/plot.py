@@ -108,7 +108,7 @@ def _coef_panel(ax, d, errorbars, title):
 
 
 IMP_TOP = 25          # variables shown in the f2 importance panels
-SEP_LIMIT = 20        # log-odds per SD; larger coefficients are separation artefacts
+SEP_LIMIT = 20        # log-odds per SD; larger coefficients are separation or collinearity artefacts
 
 
 def f2():
@@ -127,7 +127,7 @@ def f2():
         _coef_panel(ax1, all_g, False, (letter, all_g))
         if len(sep):
             names = ", ".join(sorted(sep["var"].unique()))
-            ax1.text(0, -0.11, f"Not shown (separation, |β| > {SEP_LIMIT}): {names}",
+            ax1.text(0, -0.11, f"Not shown (unstable: separation or collinearity, |β| > {SEP_LIMIT}): {names}",
                      transform=ax1.transAxes, ha="left", va="top", fontsize=7, color="0.35", wrap=True)
         ax2 = fig.add_subplot(outer[2 * row, 1])
         g5 = rst[rst.Group == 5]
