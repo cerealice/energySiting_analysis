@@ -15,6 +15,7 @@ Global Solar/Wind Atlas Italy ~0.5 GB, ERA5-Land < 0.1 GB, OSM Italy PBF
 from __future__ import annotations
 
 import argparse
+import os
 import sys
 
 from .. import config
@@ -106,6 +107,15 @@ def main():
                     problems.append(f"{name} download failed: {e}\n      (re-run this step to resume)")
         else:
             problems.append(CDS_HELP)
+
+    # geospatial embeddings (NN only; optional — problems are reported, not blocking)
+    from . import make_embeddings
+    if a.check:
+        print(f"  {'ok' if make_embeddings.ready() else 'missing'}   embeddings needing internet "
+              "(Tessera, only with ES_EMB_TESSERA=1)")
+    elif os.environ.get("ES_EMBEDDINGS", None) != "":
+        for w in make_embeddings.fetch():
+            print(f"  WARNING (optional, NN embeddings): {w}")
 
     if not NATURA_SHP.exists():
         problems.append(

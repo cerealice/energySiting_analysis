@@ -27,6 +27,7 @@ The R code is left untouched next to it so the two can be compared.
 | `modeling.R` | `modeling.py` + `learners.py` + `glm.py` | 10-group GLMs, 5 learners × 10-fold CV, maps |
 | `performance.R` | `performance.py` | ROC/Sens/Spec table, Wilcoxon, PR/ROC curves |
 | `spatial_cv.R` | `spatial_cv.py` | variogram range, spatial blocks, GBM/RF re-fit |
+| – (new) | `setup/make_embeddings.py` + `nn_embeddings.py` | geospatial embeddings (GeoCLIP, RANGE+, Copernicus-Embed, TerraNova 2016/2024; Tessera 2017/2024 with `ES_EMB_TESSERA=1`) → 16 PCs each; **NN only**, one product at a time added to the main predictors, ΔAUC vs the NN without embeddings on the same random and spatial folds |
 | – (new) | `sensitivity.py` | leakage check: GBM/RF refitted on the same folds without WorldCover "Developed" (`ES_SENSITIVITY=no_developed,no_lag,no_both`) |
 | `data.R` | `data.py` + `glmm.py` | masked maps, NUTS-1 means, random-slope GLMM |
 | `plot.R` | `plot.py` | figures f1–f4 |

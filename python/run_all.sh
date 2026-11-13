@@ -110,6 +110,12 @@ make_env() {
         pip install -q --upgrade pip
         pip install -q -r python/requirements.txt
     fi
+    if [[ "${ES_EMBEDDINGS-unset}" != "" ]]; then         # NN embeddings (optional; ES_EMBEDDINGS="" to skip)
+        log "Installing the geospatial embeddings wrapper (CPU torch)"
+        python -c "import torch" 2>/dev/null || pip install -q torch --index-url https://download.pytorch.org/whl/cpu
+        pip install -q -r python/requirements-embeddings.txt \
+            || log "WARNING: embeddings wrapper not installed — the NN-embeddings step will be skipped"
+    fi
     python - <<'EOF'
 import sys
 import sklearn, rasterio, geopandas, pyogrio, xarray, cdsapi, cfgrib  # noqa: F401
@@ -153,6 +159,7 @@ run_pipeline() {
     export ES_N_JOBS="${LSB_DJOB_NUMPROC:-${SLURM_CPUS_PER_TASK:-$(nproc)}}"
     export OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 MKL_NUM_THREADS=1   # parallelism = joblib workers
     export OSM_MAX_TMPFILE_SIZE=4096                                    # MB of RAM for GDAL's OSM reader
+    export HF_HUB_OFFLINE=1 TRANSFORMERS_OFFLINE=1                      # embeddings: weights cached by prepare
     log "Host $(hostname)  CPUs $ES_N_JOBS  root $ES_ROOT"
     log "Checking raw inputs"
     python -m energysiting.setup.fetch --check

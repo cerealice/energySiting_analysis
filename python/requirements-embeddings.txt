@@ -1,0 +1,6 @@
+# Geospatial embeddings for the NN model (setup/make_embeddings.py, nn_embeddings.py).
+# Install on the LOGIN node (needs internet); run_all.sh prepare does this for you.
+# CPU torch first, so pip does not pull the 2.5 GB CUDA build:
+#   pip install torch --index-url https://download.pytorch.org/whl/cpu
+#   pip install -r python/requirements-embeddings.txt
+geospatial-embeddings-wrapper[models,raster] @ git+https://github.com/crp94/geospatial_embeddings_wrapper

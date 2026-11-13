@@ -55,9 +55,13 @@ def run():
     config.ensure_dirs()
     cov, fut, tech_stacks = load_stacks()
     base = raster.read(config.BASE_RASTER)
+    from .setup import make_embeddings
+    emb = make_embeddings.load()          # geospatial embeddings (NN only), if built
+    if emb is not None:
+        log(f"embedding stack: {len(emb.names)} layers added to the zonal table (used by nn_embeddings)")
     for tech in config.TECHS:
-        iv = np.concatenate([cov.data, tech_stacks[tech].data], axis=0)
-        names = cov.names + config.TECH_LAYERS
+        iv = np.concatenate([cov.data, tech_stacks[tech].data] + ([emb.data] if emb is not None else []), axis=0)
+        names = cov.names + config.TECH_LAYERS + (list(emb.names) if emb is not None else [])
         ab = pd.read_csv(config.OUT / f"absence_{tech}.csv")
         zones_ab = burn_circles(ab, base.grid)
         zones_ex = raster.read(config.DERIVED / f"{tech}_hull_existing.tif").band()

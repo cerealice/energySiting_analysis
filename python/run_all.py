@@ -38,6 +38,7 @@ MAIN = [
     ("performance", "energysiting.performance", None),
     ("spatial_cv", "energysiting.spatial_cv", None),
     ("sensitivity", "energysiting.sensitivity", None),   # leakage check: refit without Developed
+    ("nn_embeddings", "energysiting.nn_embeddings", None),  # NN + geospatial embeddings
     ("data", "energysiting.data", None),
     ("plot", "energysiting.plot", None),
 ]
@@ -63,6 +64,7 @@ SETUP = [
     ("make_era5land", [V / f"{l}.tif" for l in config.ERA5LAND_LAYERS]),
     ("make_cerra", [V / "cerra_ws100_iav.tif"]),
     ("stack", None),                     # rebuilt when any input layer is newer
+    ("make_embeddings", None),           # embStack.tif: PCs of each embedding product (NN only)
 ]
 
 
@@ -123,6 +125,11 @@ def run_setup(force=False):
             from energysiting.setup import make_spatial_lag
             if make_spatial_lag.up_to_date():
                 stamp("SKIP: make_spatial_lag (pre-2017 binary lag already built)")
+                continue
+        if name == "make_embeddings" and not force:
+            from energysiting.setup import make_embeddings
+            if make_embeddings.up_to_date():
+                stamp("SKIP: make_embeddings (embStack.tif matches the selected products)")
                 continue
         if name == "stack" and not force:
             from energysiting.setup import stack

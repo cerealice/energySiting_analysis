@@ -60,25 +60,30 @@ def _baseline(tech):
     return pd.concat(rows, ignore_index=True).assign(scenario="all predictors")
 
 
+def cv_sets(tech, dat):
+    """{cv type: (data, y, folds)} — the exact folds of modeling (random) and spatial_cv."""
+    y = (dat["treat"] == "X1").astype(int).to_numpy()
+    # spatial folds index the coordinate-matched rows used by spatial_cv
+    sp = joblib.load(config.OUT / f"spatial_folds_{tech}.joblib")
+    pres = presence_xy(raster.read(config.DERIVED / f"{tech}_hull_existing.tif")).assign(treat="X1")
+    ab = pd.read_csv(config.OUT / f"absence_{tech}.csv").rename(columns={"id": "zone"})
+    coords = pd.concat([pres, ab[["zone", "x", "y"]].assign(treat="X0")], ignore_index=True)
+    dsp = dat.merge(coords, on=["zone", "treat"], how="inner")
+    ysp = (dsp["treat"] == "X1").astype(int).to_numpy()
+    return {CV[0]: (dat, y, joblib.load(config.OUT / f"folds_{tech}.joblib")),
+            CV[1]: (dsp, ysp, sp["folds"])}
+
+
 def run():
     config.ensure_dirs()
     names = scenarios()
     auc, imps = [], []
     for tech in config.TECHS:
         dat = pd.read_csv(config.OUT / f"{tech}.csv")
-        y = (dat["treat"] == "X1").astype(int).to_numpy()
         mv = config.model_vars(tech, dat.columns)
         auc.append(_baseline(tech).assign(technology=tech.capitalize()))
 
-        # spatial folds index the coordinate-matched rows used by spatial_cv
-        sp = joblib.load(config.OUT / f"spatial_folds_{tech}.joblib")
-        pres = presence_xy(raster.read(config.DERIVED / f"{tech}_hull_existing.tif")).assign(treat="X1")
-        ab = pd.read_csv(config.OUT / f"absence_{tech}.csv").rename(columns={"id": "zone"})
-        coords = pd.concat([pres, ab[["zone", "x", "y"]].assign(treat="X0")], ignore_index=True)
-        dsp = dat.merge(coords, on=["zone", "treat"], how="inner")
-        ysp = (dsp["treat"] == "X1").astype(int).to_numpy()
-        folds = {CV[0]: (dat, y, joblib.load(config.OUT / f"folds_{tech}.joblib")),
-                 CV[1]: (dsp, ysp, sp["folds"])}
+        folds = cv_sets(tech, dat)
 
         for sc in names:
             keep = [v for v in mv if v not in SCENARIOS[sc]]

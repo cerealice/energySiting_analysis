@@ -311,6 +311,12 @@ def sec_results():
                 "<p class='small muted'>GBM and RF refitted on the same folds without predictors that may "
                 "see the plants (WorldCover &ldquo;Developed&rdquo; maps PV farms as built-up). A large drop means "
                 "the full model leaned on them.</p>", _table(sens)]
+    nne = _csv("nn_emb_summary.csv")
+    if nne is not None:
+        out += ["<h3>Neural network + geospatial embeddings (mean AUC; Δ vs the NN without embeddings)</h3>",
+                "<p class='small muted'>One embedding product at a time (16 principal components) added to the "
+                "main predictors; same random and spatial-block folds. The other models never see embeddings.</p>",
+                _table(nne)]
     thr = _csv("threshold_metrics.csv")
     if thr is not None:
         out += ["<details><summary>Precision / recall / F1 / PR-AUC</summary>", _table(thr), "</details>"]
@@ -336,7 +342,7 @@ def sec_results():
 def sec_figures():
     figs = [("f3.png", "Suitability maps and regional means"), ("f_performance_roc.png", "AUC by model"),
             ("f_spatial_cv_comparison.png", "Random vs spatial CV"),
-            ("f_sensitivity.png", "Leakage sensitivity"), ("f_varimp.png", "Variable importance"),
+            ("f_sensitivity.png", "Leakage sensitivity"), ("f_nn_embeddings.png", "NN + embeddings"), ("f_varimp.png", "Variable importance"),
             ("f2.png", "GLM coefficients and importance"), ("f4.png", "Regional random effects"),
             ("f1.png", "Presences and pseudo-absences"), ("f_roc_curves.png", "ROC curves"),
             ("f_pr_curves.png", "Precision–recall curves")]
