@@ -112,6 +112,7 @@ make_env() {
     fi
     if [[ "${ES_EMBEDDINGS-unset}" != "" ]]; then         # NN embeddings (optional; ES_EMBEDDINGS="" to skip)
         log "Installing the geospatial embeddings wrapper (CPU torch)"
+        use_certifi
         python -c "import torch" 2>/dev/null || pip install -q torch --index-url https://download.pytorch.org/whl/cpu
         pip install -q -r python/requirements-embeddings.txt \
             || log "WARNING: embeddings wrapper not installed — the NN-embeddings step will be skipped"
@@ -130,10 +131,20 @@ print(f"python {sys.version.split()[0]}  scikit-learn {sklearn.__version__}  "
 EOF
 }
 
+use_certifi() {
+    # Some clusters' git has no CA bundle ("SSL certificate problem: unable to get
+    # local issuer certificate") while Python's certifi works: point git and
+    # requests at certifi (RANGE+ clones its code with git at first use).
+    local ca
+    ca="$(python -m certifi 2>/dev/null)" || return 0
+    [[ -n "${GIT_SSL_CAINFO:-}" ]] || export GIT_SSL_CAINFO="$ca"
+}
+
 prepare() {
     log "1/2  Python environment"
     make_env
     log "2/2  Downloading raw inputs (resumable; skips files already present)"
+    use_certifi
     python -m energysiting.setup.fetch
 }
 

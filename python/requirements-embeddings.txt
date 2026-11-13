@@ -3,4 +3,5 @@
 # CPU torch first, so pip does not pull the 2.5 GB CUDA build:
 #   pip install torch --index-url https://download.pytorch.org/whl/cpu
 #   pip install -r python/requirements-embeddings.txt
-geospatial-embeddings-wrapper[models,raster] @ git+https://github.com/crp94/geospatial_embeddings_wrapper
+# zip archive instead of git+https: pip's own certificates are used, not git's
+geospatial-embeddings-wrapper[models,raster] @ https://github.com/crp94/geospatial_embeddings_wrapper/archive/refs/heads/main.zip
