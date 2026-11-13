@@ -92,6 +92,35 @@ def _in_cache():
         os.chdir(old)
 
 
+RANGE_REPO = CACHE / "data_cache" / "external" / "RANGE"
+RANGE_ZIP = "https://github.com/mvrl/RANGE/archive/refs/heads/main.zip"
+
+
+def _range_repo():
+    """RANGE+ needs the mvrl/RANGE code. The wrapper clones it with git, which fails
+    on clusters whose git has no CA bundle and on offline compute nodes: download
+    the zip with requests (certifi) on the login node and point RANGE_REPO at it."""
+    if not (RANGE_REPO / "README.md").exists() and not any(RANGE_REPO.glob("*.py")):
+        import io
+        import shutil
+        import zipfile
+
+        import requests
+        print("  downloading the RANGE code (zip) …", flush=True)
+        r = requests.get(RANGE_ZIP, timeout=300)
+        r.raise_for_status()
+        tmp = RANGE_REPO.parent / ".RANGE_unzip"
+        shutil.rmtree(tmp, ignore_errors=True)
+        with zipfile.ZipFile(io.BytesIO(r.content)) as z:
+            z.extractall(tmp)
+        top = next(tmp.iterdir())                        # RANGE-main/
+        shutil.rmtree(RANGE_REPO, ignore_errors=True)
+        RANGE_REPO.parent.mkdir(parents=True, exist_ok=True)
+        top.replace(RANGE_REPO)
+        shutil.rmtree(tmp, ignore_errors=True)
+    os.environ["RANGE_REPO"] = str(RANGE_REPO)
+
+
 def _encoder(name):
     try:
         from wrappers.registry import get_encoder_class
@@ -99,6 +128,8 @@ def _encoder(name):
         raise SystemExit(
             "geospatial_embeddings_wrapper is not installed. On the login node run:\n"
             "  pip install -r python/requirements-embeddings.txt") from e
+    if name == "range_plus":
+        _range_repo()
     with _in_cache():
         return get_encoder_class(name)(device="cuda" if _cuda() else "cpu")
 
@@ -133,7 +164,7 @@ def _encode(enc, lonlat, year):
     out = []
     with _in_cache():
         for s in range(0, len(lonlat), BATCH):
-            latlon = torch.as_tensor(lonlat[s:s + BATCH][:, ::-1].copy(), dtype=torch.float64)
+            latlon = torch.as_tensor(lonlat[s:s + BATCH][:, ::-1].copy(), dtype=torch.float32)  # as the wrapper's own CLI
             e = enc.encode(latlon, year=year) if year is not None else enc.encode(latlon)
             out.append(np.asarray(e.detach().cpu().numpy(), dtype=np.float32))
             print(f"    {min(s + BATCH, len(lonlat)):,}/{len(lonlat):,}", flush=True)
