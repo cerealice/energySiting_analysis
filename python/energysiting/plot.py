@@ -102,15 +102,18 @@ def _coef_panel(ax, d, errorbars, title):
         raw = title[1]
         ax.scatter(raw.pe, raw["var"].map(ypos), s=18, color="red", edgecolor="k", lw=0.5, zorder=3)
     ax.set_yticks(range(len(order)), order.index, fontsize=7 if len(order) > 20 else 8)
-    ax.set_xlabel("Odds ratio (log scale)", fontsize=9)
+    ax.set_xlabel("Coefficient (log-odds per SD)", fontsize=9)
     ax.tick_params(axis="x", labelsize=7)
     ax.set_title(title[0], loc="left", fontsize=16)
+
+
+IMP_TOP = 25          # variables shown in the f2 importance panels
 
 
 def f2():
     imp = pd.read_csv(config.OUT / "imp.csv")
     fig = plt.figure(figsize=(13, 22))
-    outer = GridSpec(4, 2, figure=fig, height_ratios=[2.6, 1, 2.6, 1], hspace=0.45, wspace=0.55)
+    outer = GridSpec(4, 2, figure=fig, height_ratios=[2.6, 1, 2.6, 1], hspace=0.6, wspace=0.55)
     for row, (tech, t, letter) in enumerate((("Solar", "s", "A"), ("Wind", "w", "B"))):
         rst = aggregate_nuts(pd.read_csv(config.OUT / f"rst_{t}.csv"))
         rst = rst[~rst["var"].isin(config.LULC_SEP_LABELS) & (rst.color == "Y")]
@@ -123,17 +126,19 @@ def f2():
             _coef_panel(ax2, g5, True, ("", g5))
         ax3 = fig.add_subplot(outer[2 * row + 1, :])
         d = imp[imp.tech == tech]
-        order = d.groupby("rowname")["Overall"].mean().sort_values(ascending=False).index
+        n_all = d.rowname.nunique()
+        order = d.groupby("rowname")["Overall"].mean().sort_values(ascending=False).index[:IMP_TOP]
         x = np.arange(len(order))
         models = sorted(d.model.unique())
         w = 0.8 / len(models)
         for k, m in enumerate(models):
             v = d[d.model == m].set_index("rowname").reindex(order)["Overall"]
             ax3.bar(x + (k - len(models) / 2 + 0.5) * w, v, width=w, color=PAIRED[k * 2 + 1 if k < 5 else k], label=m)
-        ax3.set_xticks(x, order, rotation=60, ha="right", fontsize=5.5)
+        ax3.set_xticks(x, order, rotation=50, ha="right", fontsize=8)
         ax3.set_ylabel("Importance (%)"); ax3.set_xlim(-1, len(order))
         ax3.legend(fontsize=7, ncol=5, loc="upper right", frameon=False)
-        ax3.set_title(f"{tech} — variable importance", loc="left", fontsize=10)
+        ax3.set_title(f"{tech} — variable importance (top {len(order)} of {n_all}, "
+                      "ranked by mean across models; full table in imp.csv)", loc="left", fontsize=10)
     fig.savefig(config.FIG / "f2.png", dpi=300, bbox_inches="tight"); plt.close(fig)
 
 
@@ -206,7 +211,7 @@ def f4(bm):
             ax.errorbar(dd.R_effect, yy, xerr=dd.SE, fmt="o", color="0.1", ms=3, lw=1.2)
             ax.set_yticks(yy, [config.NUTS2[config.NUTS2_BY_NAME.get(r, 'ITC1')][1] if r in config.NUTS2_BY_NAME else r
                                for r in dd.region], fontsize=8)
-            ax.set_xlabel("Odds ratio (log scale)", fontsize=9)
+            ax.set_xlabel("Effect (log-odds)", fontsize=9)
             ax.set_title(lab, color="white", backgroundcolor="0.2", fontsize=9)
     fig.savefig(config.FIG / "f4.png", dpi=200, bbox_inches="tight"); plt.close(fig)
 

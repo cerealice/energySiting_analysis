@@ -124,7 +124,7 @@ substations mapped as areas to the substation-distance layer.
 | block | source | resolution, period | solar | wind |
 |---|---|---|---|---|
 | infrastructure, socioeconomic | OSM, ISTAT, MEF, Zenodo | 1 km / admin units | 10 | 10 |
-| climate normals | **CHELSA v2.1** BIO1–19 (replaces WorldClim) | 1 km, 1981–2010 | 19 | 19 |
+| climate normals | **CHELSA v2.1** BIO1–19 except BIO7 (= BIO5 − BIO6) (replaces WorldClim) | 1 km, 1981–2010 | 18 | 18 |
 | recent climate | **ERA5-Land** solar radiation, surface pressure | 9 km, last 5 years | 2 | 2 |
 | what only ERA5 has | ERA5 gust, clear-sky direct radiation, cloud cover, boundary layer, CAPE | 25 km, last 5 years | 5 | 5 |
 | land use | LUH3 states + MODIS NDVI | 25 km, last 5 years | 13 | 13 |
@@ -132,7 +132,7 @@ substations mapped as areas to the substation-distance layer.
 | land cover, regions | ESA WorldCover, NUTS-2 | 1 km | 27 | 27 |
 | wind resource | **Global Wind Atlas** 100 m mean speed; **CERRA** 100 m speed variability | 250 m (2008–2017); 5.5 km (last 5 years) | – | 2 |
 | technology | env score; **cf** = Global Solar Atlas PVOUT (solar) / Global Wind Atlas capacity factor IEC II (wind); spatial lag | 1 km | 3 | 3 |
-| **total** | | | **85** | **87** |
+| **total** | | | **84** | **86** |
 
 Dropped against the previous version: WorldClim BIO (→ CHELSA), ERA5 temperature /
 precipitation / evaporation / runoff (covered by CHELSA), ERA5 10 m and 100 m U/V

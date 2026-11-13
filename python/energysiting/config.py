@@ -117,6 +117,10 @@ import datetime as _dt
 CLIMATE_YEARS = list(range(_dt.date.today().year - 5, _dt.date.today().year))  # last 5 complete years
 INFRA_SOCIO = CONT_LAYERS[:10]
 CHELSA_LAYERS = [f"chelsa_bio{i:02d}" for i in range(1, 20)]
+# BIO7 (annual temperature range) is by definition BIO5 − BIO6: it stays in the
+# stack but not in the models, where it makes the GLM coefficients of BIO5/6/7
+# unidentifiable (±10⁵ log-odds; rounding noise hides the exact alias).
+CHELSA_MODEL = [l for l in CHELSA_LAYERS if l != "chelsa_bio07"]
 ERA5_KEEP = ["era5_i10fg_mean", "era5_cdir_sum", "era5_tcc_mean", "era5_blh_mean", "era5_cape_mean"]
 ERA5LAND_LAYERS = ["era5land_ssrd", "era5land_sp"]
 LUH3_NDVI = CONT_LAYERS[53:66]
@@ -185,8 +189,8 @@ WIND_ERA5_DERIVED = ["era5_ws10_mean", "era5_ws100_mean", "era5_wpd100", "era5_w
 def model_vars(tech: str, columns=None) -> list:
     """Predictors for one technology.
 
-    Current climate block (stack has CHELSA layers): solar 85, wind 87 —
-      infrastructure & socioeconomic 10, CHELSA 19, ERA5 5, ERA5-Land 2,
+    Current climate block (stack has CHELSA layers): solar 84, wind 86 —
+      infrastructure & socioeconomic 10, CHELSA 18 (BIO7 = BIO5 − BIO6 left out), ERA5 5, ERA5-Land 2,
       LUH3 + NDVI 13, extra WorldTensor 6, land cover 7, NUTS-2 20,
       [wind: GWA 100 m speed, CERRA variability], env + cf + lag.
     Legacy block (R's 102- or the 108-layer stack): R's 96 + 6 WorldTensor
@@ -202,7 +206,7 @@ def model_vars(tech: str, columns=None) -> list:
     cols = set(columns) if columns is not None else set(COV_LAYERS) | set(TECH_LAYERS)
     wt_extra = WT_EXTRA_LAYERS if os.environ.get("ES_WT_EXTRA", "1") != "0" else []
     if "chelsa_bio01" in cols and os.environ.get("ES_CLIMATE_SET", "v2") != "legacy":
-        v = (INFRA_SOCIO + CHELSA_LAYERS + ERA5_KEEP + ERA5LAND_LAYERS + LUH3_NDVI + wt_extra
+        v = (INFRA_SOCIO + CHELSA_MODEL + ERA5_KEEP + ERA5LAND_LAYERS + LUH3_NDVI + wt_extra
              + LULC_LAYERS[:-1] + [l for l in NUTS2_LAYERS if l != "nuts2_itg2"]
              + (WIND_RESOURCE if tech == "wind" else []) + TECH_LAYERS)
     else:
